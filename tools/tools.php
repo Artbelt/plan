@@ -346,7 +346,7 @@ function show_order_checkedlist($order_number){
             ."<td style=' border: 1px solid black'>".$row['count']." <input type='hidden' name='count_".$counter."' id='counter_id' value='".$row['count']."'</td>";
         $filter_data = get_filter_data($row['filter']);
         $width_of_paper_package = $filter_data['paper_package_width'];
-        if (($width_of_paper_package <= 195) AND ($width_of_paper_package >= 174)){
+        if (($width_of_paper_package <= 195) AND ($width_of_paper_package >= 170)){
             echo "<td style=' border: 1px solid black' bgcolor='yellow'>".$width_of_paper_package." <input type='hidden' name='width_".$counter."' id='width_id' value='".$width_of_paper_package."'</td>";
         } else {
             echo "<td style=' border: 1px solid black'>".$width_of_paper_package." <input type='hidden' name='width_".$counter."' id='width_id' value='".$width_of_paper_package."'</td>";
@@ -366,6 +366,7 @@ function show_order_checkedlist($order_number){
             ."</tr>";
     }
 
+    echo "<input type='hidden' name='order_number' value ='".$order_number."'>";
     echo "</table>";
     echo "<input type='submit'>";
     echo "</form>";
@@ -881,7 +882,7 @@ function component_analysis_box($order_number){
     /** временно выключаем функцию сложения однаковых позиций, так как в ней очевидно ошибка */
    // $temp_array = summ_the_same_elements_of_array($temp_array);
 
-
+    /** Вывод коробок как есть */
     echo '<table style=" border-collapse: collapse;">';
     echo '<tr><td colspan="4"><h3 style="font-family: Calibri; size: 20px;text-align: center">Заявка</h3></td></tr>';
     echo '<tr><td colspan="4">на поставку коробок индивидуальных для: У2</td></tr>';
@@ -899,6 +900,35 @@ function component_analysis_box($order_number){
     echo '<tr><td colspan="4"><pre> </pre></td></tr>';
     echo '<tr><td colspan="2">Заявку составил:</td><td colspan="2"><input type="text"></td></tr>';
     echo '</table>';
+
+    /** Вывод коробок подсчитанных */
+
+    function calculate_total_boxes($box_array) {
+        $expenses = array();
+
+        // Проходим по каждой строке таблицы
+        foreach ($box_array as $row) {
+            // Извлекаем имя и стоимость из строки
+            $box = $row[0];
+            $count = $row[1];
+
+            // Если имя уже существует в массиве $expenses, добавляем стоимость, иначе создаем новую запись
+            if (array_key_exists($box, $expenses)) {
+                $expenses[$box] += $count;
+            } else {
+                $expenses[$box] = $count;
+            }
+        }
+
+        return $expenses;
+    }
+
+    $result = calculate_total_boxes($temp_array);
+
+    echo '<pre>';
+    ksort($result);
+    print_r($result);
+
 }
 
 ?>

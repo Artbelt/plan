@@ -21,9 +21,9 @@ if(isset($_GET['filter'])){
 
 
 
-    echo "<select id='select_filter' size=".$result->num_rows.">";
+    echo "<select id='select_filter' width='150' size=".$result->num_rows.">";
     while ($row = $result->fetch_assoc()) {
-        echo "<option>".$row['filter']."</option><br>";
+        echo "<option size = '250' title=".$row['filter'].">".$row['filter']."</option><br>";
     }
     echo "</select>";
     /* удаление выборки */

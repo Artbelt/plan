@@ -14,7 +14,10 @@ require_once('tools/tools.php');
 <body>
 
 
-<?php  echo '<table border="1"><tr><td>'.$_POST['workshop'].'</td></tr></table>';
+<?php
+
+echo " <H3><b>Добавление нового фильтра в БД</b></H3>";
+
 if (isset($_POST['filter_name'])){
     $filter_name = $_POST['filter_name'];
 } else {

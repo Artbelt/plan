@@ -40,9 +40,9 @@ if ((isset($_SESSION['user'])&&(isset($_SESSION['workshop'])))){
 
 }else{
 
-    $user = $_POST['user_name'];
-    $password = $_POST['user_pass'];
-    $workshop = $_POST['workshop'];
+    $user = $_GET['user_name'];
+    $password = $_GET['user_pass'];
+    $workshop = $_GET['workshop'];
     $advertisement = 'SOME INFORMATION';
 
     /** Подключаемся к БД */
@@ -87,7 +87,7 @@ if ((isset($_SESSION['user'])&&(isset($_SESSION['workshop'])))){
 
     /** Проверка соответствия уровня доступа выбранному значению участка */
     $access = false;//маркер доступа
-    switch ($_POST['workshop']) {
+    switch ($_GET['workshop']) {
             case 'ZU':
                 if ($user_data['ZU'] > 0) $access = true;
                 break;
@@ -123,6 +123,7 @@ if ((isset($_SESSION['user'])&&(isset($_SESSION['workshop'])))){
     $_SESSION['user'] = $user;
     $_SESSION['workshop'] = $workshop;
 }
+echo '<title>'.$workshop.'</title>';
 
 /** ---------------------------------------------------------------------------------------------------------------- */
 /**                                                 конец авторизации                                                */
