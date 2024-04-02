@@ -167,7 +167,7 @@ function write_of_parts($date_of_production, $order_number, $parts){
 /** Функция возвращает получает дату в формате dd-mm-yy а возвращает yy-mm-dd */
 function reverse_date($date){
 
-    $reverse_date=date('yy-m-d',strtotime($date));
+    $reverse_date=date('Y-m-d',strtotime($date));
     return $reverse_date;
 }
 
