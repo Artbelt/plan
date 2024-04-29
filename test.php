@@ -68,6 +68,23 @@ $initial_order = new Planned_order;
 /** Задаем ему имя */
 $initial_order->set_name($order_number);
 
+/** Задаем ему заявку */
+$initial_order->set_order(get_order($order_number));
+
+/** Проверяем на наличие фильтров в БД */
+$initial_order->check_for_new_filters();
+
+/** получаем данные для расчета раскроя (параметры гофропакетов) */
+$initial_order->get_data_for_cutting_separately($main_roll_length);
+
+/** инициализируем массив для формирования раскроев */
+$initial_order->cut_array_and_half_cut_array_init();
+
+$initial_order->cu
+
+
+
+
 
 ?>
 

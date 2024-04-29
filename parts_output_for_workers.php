@@ -164,7 +164,7 @@
                     </select>
                     <br>
                     по заявке № <br>
-                    <?php load_orders() ?>
+                    <?php load_orders(0,'','form') ?>
             </td></tr>
         <tr>
             <td align="center" bgcolor="#1e90ff">

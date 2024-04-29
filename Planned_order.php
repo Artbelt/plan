@@ -123,6 +123,50 @@ class Planned_order
             /** ДОбавляяем в массив количество рулонов необходимое */
             array_push($this->initial_order[$x], $required_number_of_rolls);
         }
+    }    /** получаем параметры гофропакетов
+     * @param $roll_length - длина рулона
+     * @param $array_of_separatist - массив позиций, которые надо кроить
+     */
+    public function get_data_for_cutting_separately($roll_length, $array_of_separatist){
+        /** в цикле перебираем массив заявки, извлекаем номер фильтра, по номеру делаем выборку и получаем параметры г/пакета */
+        for ($x = 0; $x < count($this->initial_order); $x++){
+            /** определяем имя фильтра в данной записи */
+            $pp_name = 'гофропакет '.$this->initial_order[$x][0];
+            /** делаем запрос к БД на выборку параметров г/пакетов */
+            $result = mysql_execute("SELECT * FROM paper_package_panel WHERE p_p_name = '$pp_name'");
+            if ($result->num_rows === 0) {
+                echo "Данные для расчета заявки не полные. Расчет остановлен.
+                       Не полные данные на фильтр $pp_name";
+                exit();
+            }
+            $row = $result->fetch_assoc();
+            /** получаем высоту */
+            $pp_height = $row['p_p_height'];
+            /** получаем ширину */
+            $pp_width = $row['p_p_width'];
+            /** получаем количество ребер */
+            $pp_pleats_count = $row['p_p_pleats_count'];
+            /** вычисляем количество г/пакетов с рулона */
+            $count_of_pp_per_roll = round($roll_length / ((($pp_height*2+2)*$pp_pleats_count) / 1000));
+
+            /** вычисляем необходимое количество рулонов */
+            //$required_number_of_rolls = ceil($this->initial_order[$x][1] / $count_of_pp_per_roll);  // округление вверх
+            //$required_number_of_rolls = round($this->initial_order[$x][1] / $count_of_pp_per_roll,1);  // округление
+            //$required_number_of_rolls = $this->initial_order[$x][1] / $count_of_pp_per_roll;  // без округления
+            $required_number_of_rolls = round($this->initial_order[$x][1] / $count_of_pp_per_roll,1);  // округление по 0,5
+            $required_number_of_rolls = 0.5 * round($required_number_of_rolls/0.5);                            // округление по 0,5
+
+            /** добавлем в массив заявки высоту г/пакета */
+            array_push($this->initial_order[$x], $pp_height);
+            /** добавлем в массив заявки ширину г/пакета */
+            array_push($this->initial_order[$x], $pp_width);
+            /** добавлем в массив заявки количество ребер г/пакета */
+            array_push($this->initial_order[$x], $pp_pleats_count);
+            /** Добавляем в массив заявки количество гофропакетов с рулона */
+            array_push($this->initial_order[$x], $count_of_pp_per_roll);
+            /** ДОбавляяем в массив количество рулонов необходимое */
+            array_push($this->initial_order[$x], $required_number_of_rolls);
+        }
     }
 
     /** Инициируем массив для формирования раскроев

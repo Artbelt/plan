@@ -15,6 +15,43 @@ function print_r_my ($a){
     }
 }
 
+/** Проверяет является ли пользователь администратором */
+function is_admin($user){
+    $sql = "SELECT * FROM users WHERE user = '".$user."'";
+    $result = mysql_execute($sql);
+    $status = mysqli_fetch_assoc($result);
+    if ($status['Admin'] == 1){
+        return true;
+    } else {
+        return false;
+    }
+}
+
+/** Функция рисует кнопку предоставления доступа для редактирования */
+function edit_access_button_draw(){
+    //echo '<button>Дать доступ для редактирования</button>';
+    echo '<form action="edit_access_processing.php" target="_blank" method="post">';
+    echo '<input type = "submit" value="Дать доступ для редактрования"/>';
+    echo '</form>';
+
+}
+
+/** Функция показывает есть ли доступ к редактированию данных */
+function is_edit_access_granted(){
+    //получаем статус возможности редактирования
+    /** Выполняем запрос SQL для загрузки заявок*/
+    $sql = "SELECT * FROM editor_access_time";
+    $result = mysql_execute($sql);
+    $access_time_result = mysqli_fetch_assoc($result);
+    $acces_time = $access_time_result['access_time'];
+    $now_time = date("Y-m-d H:i:s");
+    if ($acces_time > $now_time){
+        return true;
+    } else {
+        return false;
+    }
+}
+
 /** Отображение выпуска продукции за последнюю неделю */
 function show_weekly_production(){
     for ($a = 1; $a < 11; $a++) {
@@ -34,8 +71,14 @@ function show_weekly_production(){
     }
 }
 
-/** Создание <SELECT> списка с перечнем заявок */
-function load_orders(){
+/** Создание списка с перечнем заявок
+ * @param $list = 0 => вЫпадающий список
+ * @param $list = 1 => список
+ * @param $selection - в варианте с выпадающим списком значение будет выбрано как активное
+ * @param $form - принадлежность элемента input к форме(имя формы)
+ * @return ни чего не возвращает, просто рисует список заявок
+ */
+function load_orders($list, $selection, $form){
 
     global $mysql_host,$mysql_user,$mysql_user_pass,$mysql_database;
 
@@ -45,23 +88,54 @@ function load_orders(){
     /** Выполняем запрос SQL для загрузки заявок*/
     $sql = "SELECT DISTINCT order_number, workshop FROM orders;";
 
+    if (!isset($form)){
+        $form = 'form';
+    }
+
     /** Если запрос не удачный -> exit */
     if (!$result = $mysqli->query($sql)){ echo "Ошибка: Наш запрос не удался и вот почему: \n Запрос: " . $sql . "\n"."Номер ошибки: " . $mysqli->errno . "\n Ошибка: " . $mysqli->error . "\n";
         exit;
     }
 
-    /** Разбор массива значений  */
-    echo "<select id='selected_order'>";
-    while ($orders_data = $result->fetch_assoc()){
-            echo "<option name='order_number' value=".$orders_data['order_number'].">".$orders_data['order_number']."</option>";
-    }
-    echo "</select>";
+    if ($list == '0') {
 
+        if (isset($selection)&&($selection != 0)){// если $selected определено
+            /** Разбор массива значений для выпадающего списка */
+            echo "<select id='selected_order' name = 'selected_order' form='".$form."'>";
+            while ($orders_data = $result->fetch_assoc()) {
+                if ($selection == $orders_data['order_number']){
+                    echo "<option name='order_number' value=" . $orders_data['order_number'] . " selected>" . $orders_data['order_number'] . "</option>";
+                } else {
+                    echo "<option name='order_number' value=" . $orders_data['order_number'] . ">" . $orders_data['order_number'] . "</option>";
+                }
+
+            }
+            echo "</select>";
+        } else {
+
+            /** Если $selected не определено то делаем список */
+            /** Разбор массива значений для выпадающего списка */
+            echo "<select id='selected_order'  name = 'selected_order' form='".$form."'>";
+            while ($orders_data = $result->fetch_assoc()) {
+                echo "<option name='order_number' value=" . $orders_data['order_number'] . ">" . $orders_data['order_number'] . "</option>";
+            }
+            echo "</select>";
+        }
+    } else {
+        echo 'Перечень заявок';
+        /** Разбор массива значений для списка чекбоксов */
+        echo "<form action='orders_editor.php' method='post'>";
+        while ($orders_data = $result->fetch_assoc()) {
+            echo "<input type='checkbox' name='order_name[]'value=".$orders_data['order_number']." <label>".$orders_data['order_number'] ."</label><br>";
+        }
+        echo "<button type='submit'>Объединить для расчета</button>";
+        echo "</form>";
+
+    }
     /** Закрываем соединение */
     $result->close();
     $mysqli->close();
 }
-
 /** СОздание <SELECT> списка с перечнем фильтров имеющихся в БД */
 function load_filters_into_select(){
 

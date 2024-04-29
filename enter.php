@@ -123,7 +123,10 @@ if ((isset($_SESSION['user'])&&(isset($_SESSION['workshop'])))){
     $_SESSION['user'] = $user;
     $_SESSION['workshop'] = $workshop;
 }
-echo '<title>'.$workshop.'</title>';
+echo '<title>U2</title>';
+echo '<head>';
+echo '<script> setInterval(() => window.location.reload(), 15000);</script>';//автообновление страницы каждые 15 сек
+echo '</head>';
 
 /** ---------------------------------------------------------------------------------------------------------------- */
 /**                                                 конец авторизации                                                */
@@ -133,8 +136,19 @@ echo '<title>'.$workshop.'</title>';
 /**                                              Шапка главного окна                                                 */
 /** ---------------------------------------------------------------------------------------------------------------- */
 echo "<table  width=100% height=100% style='background-color: #6495ed' >"
-    ."<tr height='10%' align='center' style='background-color: #dedede'><td width='20%' >Подразделение: $workshop"
-    ."</td><td width='80%'><!--#application_name=--><br>$application_name<br></td>"
+    ."<tr height='10%' align='center' style='background-color: #dedede'><td width='20%' >Подразделение: $workshop";
+
+if (is_admin($user)){
+    edit_access_button_draw();
+}
+
+if (is_edit_access_granted()){
+    echo '<div id = "alert_div_1" style="width: 220; height: 5; background-color: lightgreen;"></div><p>';
+}else{
+    echo '<div id = "alert_div_2" style="width: 220; height: 5; background-color: gray;"></div><p>';
+}
+
+echo "</td><td width='80%'><!--#application_name=--><br>$application_name<br></td>"
     ."<td >Пользователь: $user<br><a href='logout.php'>выход из системы</a></td></tr>"
     ."<tr height='10%' align='center' ><td colspan='3'>#attention block<br>";
 
@@ -150,6 +164,7 @@ echo "<tr align='center'><td>"
     ."<tr height='80%'><td>Операции: <p>"
         ."<form action='product_output.php' method='post'><input type='submit' value='Выпуск продукции'  style=\"height: 20px; width: 220px\"></form>"
           ."<form action='product_output_view.php' method='post'><input type='submit' value='Обзор выпуска продукции'  style=\"height: 20px; width: 220px\"></form>"
+          ."<form action='parts_output_for_workers.php' method='post'><input type='submit' value='Внесение изготовленных гофропакетов'></form>"
     ."</td></tr>"
     ."<tr bgcolor='#6495ed'><td>"
 
@@ -173,6 +188,11 @@ echo "<tr align='center'><td>"
         ."<input type='hidden' name='workshop' value='$workshop'>"
         ."<input type='submit'  value='изменить параметры фильтра'  style=\"height: 20px; width: 220px\">"
         ."</form>"
+
+    ."<form action='manufactured_production_editor.php' method='post' target='_blank'>"
+    ."<input type='hidden' name='workshop' value='U2'>"
+    ."<input type='submit'  value='Редактор внесенной продукции'  style=\"height: 20px; width: 220px\">"
+    ."</form>"
 
     ."</td></tr>"
     ."</table>";
