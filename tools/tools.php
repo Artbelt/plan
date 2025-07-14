@@ -1,7 +1,95 @@
 <?php /** tools.php в файле прописаны разные функции */
 
 /** ПОдключаем функции */
-require_once('settings.php') ;
+require_once('C:/xampp/htdocs/plan/settings.php') ;
+
+
+function show_ads(){
+
+    global $mysql_host,$mysql_user,$mysql_user_pass,$mysql_database;
+
+    $host = $mysql_host;
+    $db = $mysql_database;
+    $user = $mysql_user;
+    $pass = $mysql_user_pass;
+
+    try {
+        $pdo = new PDO("mysql:host=$host;dbname=$db", $user, $pass);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+        // Запрос активных объявлений
+        $stmt = $pdo->prepare("SELECT * FROM ads WHERE expires_at >= NOW() ORDER BY expires_at ASC");
+        $stmt->execute();
+        $ads = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        die("Ошибка подключения: " . $e->getMessage());
+    }
+    ?>
+    <style>
+        .ads-container {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            color: #333;
+        }
+        .ads-container h1 {
+            font-size: 24px;
+            color: #0056b3;
+            border-bottom: 2px solid #0056b3;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+        .ads-container ul {
+            list-style: none;
+            padding: 0;
+        }
+        .ads-container li {
+            background: #ffdddd; /* Светло-красный фон */
+            border: 1px solid #dd5555; /* Красная рамка для контраста */
+            border-radius: 5px;
+            margin-bottom: 10px;
+            padding: 15px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .ads-container h2 {
+            font-size: 18px;
+            margin: 0 0 10px;
+            color: #333;
+        }
+        .ads-container p {
+            font-size: 14px;
+            margin: 0 0 10px;
+        }
+        .ads-container small {
+            font-size: 12px;
+            color: #666;
+        }
+        .ads-container .no-ads {
+            font-size: 16px;
+            color: #888;
+            text-align: center;
+        }
+    </style>
+
+
+    <div class="ads-container">
+        Объявления:
+        <?php if (!empty($ads)): ?>
+            <ul>
+                <?php foreach ($ads as $ad): ?>
+                    <li>
+                        <h2><?= htmlspecialchars($ad['title']) ?></h2>
+                        <p><?= htmlspecialchars($ad['content']) ?></p>
+                        <small>Действительно до: <?= htmlspecialchars($ad['expires_at']) ?></small>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+        <?php else: ?>
+            <p class="no-ads">Нет актуальных объявлений.</p>
+        <?php endif; ?>
+    </div>
+    <?php
+
+}
 
 
 /** Вывод массива в удобном виде
@@ -268,13 +356,16 @@ function select_produced_filters_by_order($filter_name, $order_name){
         return "ERROR#01";
     }
 
+    $dates = [];
+
     /** Разбираем результата запроса */
     while ($row = $result->fetch_assoc()){
         $count += $row['count_of_filters'];
+        array_push($dates, $row['date_of_production'],$row['count_of_filters']);
     }
 
     /** Создаем массив для вывода результата*/
-    $result_part_one = "#in_construction";
+    $result_part_one = $dates;
     $result_part_two = $count;
     $result_array = [];
     array_push($result_array,$result_part_one);
@@ -314,7 +405,9 @@ function manufactured_part_count($part,$order) {
         $count += $row['count_of_parts'];
     }
 
-    return $count;
+    $temporary = $count.'_'.$part.'_'.$order;
+    return $temporary;
+    #return $count;
 }
 
 
@@ -953,30 +1046,7 @@ function component_analysis_box($order_number){
         array_push($temp_array,array($value['box'],$value['count']));
     }
 
-    /** временно выключаем функцию сложения однаковых позиций, так как в ней очевидно ошибка */
-   // $temp_array = summ_the_same_elements_of_array($temp_array);
-
-    /** Вывод коробок как есть */
-    echo '<table style=" border-collapse: collapse;">';
-    echo '<tr><td colspan="4"><h3 style="font-family: Calibri; size: 20px;text-align: center">Заявка</h3></td></tr>';
-    echo '<tr><td colspan="4">на поставку коробок индивидуальных для: У2</td></tr>';
-    echo '<tr><td colspan="4"><pre> </pre></td></tr>';
-    echo '<tr><td>№п/п</td><td>Комплектующее</td><td>Кол-во</td><td>Дата поставки</td></tr>';
-
-    $i=1;// счетчик циклов для отображения в таблице порядкового номера
-    foreach ($temp_array as $value){
-        echo '<tr><td>'.$i.'</td><td>'.$value[0].'</td><td>'.$value[1].'</td><td><input type="text"></td>';
-        $i++;
-    }
-
-    echo '<tr><td colspan="4"><pre> </pre></td></tr>';
-    echo '<tr><td colspan="2">Дата составления заявки:</td><td colspan="2">'.date('d.m.y ').'</td></tr>';
-    echo '<tr><td colspan="4"><pre> </pre></td></tr>';
-    echo '<tr><td colspan="2">Заявку составил:</td><td colspan="2"><input type="text"></td></tr>';
-    echo '</table>';
-
     /** Вывод коробок подсчитанных */
-
     function calculate_total_boxes($box_array) {
         $expenses = array();
 
@@ -998,10 +1068,25 @@ function component_analysis_box($order_number){
     }
 
     $result = calculate_total_boxes($temp_array);
-
-    echo '<pre>';
     ksort($result);
-    print_r($result);
+
+    echo '<table style=" border-collapse: collapse;">';
+    echo '<tr><td colspan="4"><h3 style="font-family: Calibri; size: 20px;text-align: center">Заявка</h3></td></tr>';
+    echo '<tr><td colspan="4">на поставку коробок индивидуальных для: У2</td></tr>';
+    echo '<tr><td colspan="4"><pre> </pre></td></tr>';
+    echo '<tr><td>№п/п</td><td>Комплектующее</td><td>Кол-во</td><td>Дата поставки</td></tr>';
+
+    $i=1;// счетчик циклов для отображения в таблице порядкового номера
+    foreach ($result as $key => $value){
+        echo '<tr><td>'.$i.'</td><td>'.$key.'</td><td>'.$value.'</td><td><input type="text"></td>';
+        $i++;
+    }
+
+    echo '<tr><td colspan="4"><pre> </pre></td></tr>';
+    echo '<tr><td colspan="2">Дата составления заявки:</td><td colspan="2">'.date('d.m.y ').'</td></tr>';
+    echo '<tr><td colspan="4"><pre> </pre></td></tr>';
+    echo '<tr><td colspan="2">Заявку составил:</td><td colspan="2"><input type="text"></td></tr>';
+    echo '</table>';
 
 }
 

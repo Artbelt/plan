@@ -1,4 +1,5 @@
 <?php
+require 'PHPExcel/Classes/PHPExcel.php';
 
 if(isset($_FILES['userfile'])) {
     $uploaddir = 'uploads/';

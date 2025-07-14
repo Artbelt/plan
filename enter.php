@@ -125,7 +125,7 @@ if ((isset($_SESSION['user'])&&(isset($_SESSION['workshop'])))){
 }
 echo '<title>U2</title>';
 echo '<head>';
-echo '<script> setInterval(() => window.location.reload(), 15000);</script>';//автообновление страницы каждые 15 сек
+//echo '<script> setInterval(() => window.location.reload(), 15000);</script>';//автообновление страницы каждые 15 сек
 echo '</head>';
 
 /** ---------------------------------------------------------------------------------------------------------------- */
@@ -161,10 +161,17 @@ echo $advertisement."</td></tr>";
 /** ---------------------------------------------------------------------------------------------------------------- */
 echo "<tr align='center'><td>"
     ."<table  height='100%' width='100%' bgcolor='white' style='border-collapse: collapse'>"
-    ."<tr height='80%'><td>Операции: <p>"
-        ."<form action='product_output.php' method='post'><input type='submit' value='Выпуск продукции'  style=\"height: 20px; width: 220px\"></form>"
-          ."<form action='product_output_view.php' method='post'><input type='submit' value='Обзор выпуска продукции'  style=\"height: 20px; width: 220px\"></form>"
-          ."<form action='parts_output_for_workers.php' method='post'><input type='submit' value='Внесение изготовленных гофропакетов'></form>"
+    ."<tr height='80%'><td>Операции: <p>";
+?>
+<a href="test.php" target="_blank" rel="noopener noreferrer">
+    <button style="height: 20px; width: 220px">Выпуск продукции</button>
+</a>
+
+<?php
+        echo "<form action='parts_output_for_workers.php' method='post'><input type='submit' value='Внесение изготовленных гофропакетов'></form>"
+        ."Обзор операций:<p>"
+        ."<form action='product_output_view.php' method='post'><input type='submit' value='Обзор выпуска продукции'  style=\"height: 20px; width: 220px\"></form>"
+        ."<form action='parts_output_view.php' method='post'><input type='submit' value='Обзор выпуска комплектующих'  style=\"height: 20px; width: 220px\"></form>"
     ."</td></tr>"
     ."<tr bgcolor='#6495ed'><td>"
 
@@ -192,9 +199,43 @@ echo "<tr align='center'><td>"
     ."<form action='manufactured_production_editor.php' method='post' target='_blank'>"
     ."<input type='hidden' name='workshop' value='U2'>"
     ."<input type='submit'  value='Редактор внесенной продукции'  style=\"height: 20px; width: 220px\">"
-    ."</form>"
+    ."</form>";
 
-    ."</td></tr>"
+        ?>
+
+
+
+
+        <form action="create_ad.php" method="post" style="display: flex; flex-direction: column; max-width: 400px; gap: 10px;">
+            <label style="display: flex; flex-direction: column; font-weight: bold;">
+                <span>Название объявления</span>
+                <input type="text" name="title" placeholder="Введите название" required
+                       style="padding: 8px; font-size: 16px; border: 1px solid #ccc; border-radius: 5px;">
+            </label>
+
+            <label style="display: flex; flex-direction: column; font-weight: bold;">
+                <span>Текст объявления</span>
+                <textarea name="content" placeholder="Введите текст" required
+                          style="padding: 8px; font-size: 16px; border: 1px solid #ccc; border-radius: 5px; resize: vertical; min-height: 100px;"></textarea>
+            </label>
+
+            <label style="display: flex; flex-direction: column; font-weight: bold;">
+                <span>Дата окончания</span>
+                <input type="date" name="expires_at" required
+                       style="padding: 8px; font-size: 16px; border: 1px solid #ccc; border-radius: 5px;">
+            </label>
+
+            <button type="submit"
+                    style="padding: 10px; font-size: 16px; background-color: #007bff; color: white; cursor: pointer; border: none; border-radius: 5px;"
+                    onmouseover="this.style.backgroundColor='#0056b3'"
+                    onmouseout="this.style.backgroundColor='#007bff'">
+                Создать объявление
+            </button>
+        </form>
+
+
+<?php
+    echo "</td></tr>"
     ."</table>";
 
 /** ---------------------------------------------------------------------------------------------------------------- */
@@ -203,7 +244,12 @@ echo "<tr align='center'><td>"
 echo "</td><td>"
     ."<table height='100%' width='100%' bgcolor='white' style='border-collapse: collapse'>"
     //."<tr><td>1</td><td>2</td></tr>"
-    ."<tr><td style='color: cornflowerblue'>изготовленая продукция за последние 10 дней: <p>";
+    ."<tr><td style='color: cornflowerblue'>";
+show_ads();
+
+echo "изготовленая продукция за последние 10 дней: <p>";
+
+
 
 show_weekly_production();
 
@@ -231,7 +277,6 @@ if ($mysqli->connect_errno) {
 
 /** Выполняем запрос SQL для загрузки заявок*/
 $sql = "SELECT DISTINCT order_number, workshop, hide FROM orders;";
-//$sql = 'SELECT order_number FROM orders;';
 if (!$result = $mysqli->query($sql)){
     echo "Ошибка: Наш запрос не удался и вот почему: \n Запрос: " . $sql . "\n"
         ."Номер ошибки: " . $mysqli->errno . "\n Ошибка: " . $mysqli->error . "\n";
@@ -241,15 +286,24 @@ if (!$result = $mysqli->query($sql)){
 if ($result->num_rows === 0) { echo "В базе нет ни одной заявки";}
 
 /** Разбор массива значений  */
-echo '<form action="show_order.php" method="post">';
+echo '<form action="show_order.php" method="post"  target="_blank">';
 while ($orders_data = $result->fetch_assoc()){
     if (($workshop == $orders_data['workshop'])&( $orders_data['hide'] != 1)){
         echo "<input type='submit' name='order_number' value=".$orders_data['order_number']." style=\"height: 20px; width: 240px\">";
-
     }
 }
 
+
+
+
 echo '</form>';
+
+
+?>
+<form action="archived_orders.php" target="_blank">
+    <input type="submit" value="Архив заявок" style="height: 20px; width: 215px">
+</form>
+<?php
 
 /** Блок распланированных заявок  */
 echo "Распланированные заявки";

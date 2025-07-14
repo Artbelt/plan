@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" serverName="plan">
+  <component name="PublishConfigData" serverName="Local or mounted folder">
     <serverData>
-      <paths name="plan">
+      <paths name="Local or mounted folder">
         <serverdata>
           <mappings>
-            <mapping local="$PROJECT_DIR$" web="localhost/plan" />
+            <mapping local="$PROJECT_DIR$" web="plan" />
           </mappings>
         </serverdata>
       </paths>

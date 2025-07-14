@@ -1,4 +1,65 @@
 <script>
+    function generateReport() {
+        // Отримуємо таблицю
+        var table = document.getElementById('produced_filters_table');
+        var rows = table.rows;
+
+        // Об'єкти для зберігання підрахунків
+        var filterCounts = {};
+        var packagingCounts = {};
+
+        // Проходимо по кожному рядку таблиці, починаючи з другого (індекс 1)
+        for (var i = 1; i < rows.length; i++) {
+            var cells = rows[i].cells;
+            var filter = cells[1].textContent;
+            var quantity = parseInt(cells[2].textContent);
+            var packaging = cells[4].textContent;
+
+            // Підраховуємо кількість фільтрів
+            if (filterCounts[filter]) {
+                filterCounts[filter] += quantity;
+            } else {
+                filterCounts[filter] = quantity;
+            }
+
+            // Підраховуємо кількість упаковок
+            if (packagingCounts[packaging]) {
+                packagingCounts[packaging] += quantity;
+            } else {
+                packagingCounts[packaging] = quantity;
+            }
+        }
+
+        // Створюємо нове вікно для звіту
+        var reportWindow = window.open("", "Report", "width=800,height=600");
+
+        // Створюємо таблицю для фільтрів
+        var filterTable = "<h2>Фільтри</h2><table border='1'><tr><th>Фільтр</th><th>Кількість</th></tr>";
+        for (var filter in filterCounts) {
+            filterTable += "<tr><td>" + filter + "</td><td>" + filterCounts[filter] + "</td></tr>";
+        }
+        filterTable += "</table>";
+
+        // Сортуємо упаковки за кількістю
+        var sortedPackagings = Object.keys(packagingCounts).sort(function(a, b) {
+            return packagingCounts[b] - packagingCounts[a];
+        });
+
+        // Створюємо таблицю для упаковок
+        var packagingTable = "<h2>Упаковки</h2><table border='1'><tr><th>Упаковка</th><th>Кількість</th></tr>";
+        sortedPackagings.forEach(function(packaging) {
+            packagingTable += "<tr><td>" + packaging + "</td><td>" + packagingCounts[packaging] + "</td></tr>";
+        });
+        packagingTable += "</table>";
+
+        // Вставляємо таблиці у нове вікно
+        reportWindow.document.write("<html><head><title>Звіт</title></head><body>");
+        //reportWindow.document.write(filterTable);
+        reportWindow.document.write(packagingTable);
+        reportWindow.document.write("</body></html>");
+    }
+</script>
+<script>
     function show_raiting() {
         // Отримуємо таблицю
         var table = document.getElementById('produced_filters_table');

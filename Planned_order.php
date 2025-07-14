@@ -88,6 +88,9 @@ class Planned_order
         for ($x = 0; $x < count($this->initial_order); $x++){
             /** определяем имя фильтра в данной записи */
             $pp_name = 'гофропакет '.$this->initial_order[$x][0];
+
+
+
             /** делаем запрос к БД на выборку параметров г/пакетов */
             $result = mysql_execute("SELECT * FROM paper_package_panel WHERE p_p_name = '$pp_name'");
             if ($result->num_rows === 0) {
@@ -96,12 +99,21 @@ class Planned_order
                 exit();
             }
             $row = $result->fetch_assoc();
+
+            /** Проверка принадлежности к участку если не У2 то ни чего с этой позицией не делаем */
+            $shop = $row['supplier'];
+            if ($shop != 'У2'){
+                continue;
+            }
+
+
             /** получаем высоту */
             $pp_height = $row['p_p_height'];
             /** получаем ширину */
             $pp_width = $row['p_p_width'];
             /** получаем количество ребер */
             $pp_pleats_count = $row['p_p_pleats_count'];
+
             /** вычисляем количество г/пакетов с рулона */
             $count_of_pp_per_roll = round($roll_length / ((($pp_height*2+2)*$pp_pleats_count) / 1000));
 
@@ -171,8 +183,37 @@ class Planned_order
 
     /** Инициируем массив для формирования раскроев
      * конструкция массива $cut_array{filter, pp_height, pp_width} */
-    public function cut_array_and_half_cut_array_init(){
-        for ($x = 0; $x < count($this->initial_order); $x++){
+//    public function cut_array_and_half_cut_array_init(){
+//        for ($x = 0; $x < count($this->initial_order); $x++){
+//            $temp = array();
+//            array_push($temp, $this->initial_order[$x][0]);
+//            array_push($temp, $this->initial_order[$x][2]);
+//            array_push($temp, $this->initial_order[$x][3]);
+//
+//            $repeat_times = $this->initial_order[$x][6];
+//
+//            if($repeat_times - floor($repeat_times) != 0) {/** если есть 0,5 рулона */
+//                /** добаляем 0,5 рулона в массив с половинами рулонов */
+//                array_push($this->half_cut_array,  $temp);
+//                $repeat_times = $repeat_times - 0.5;
+//                $y=0;
+//
+//                    for ($z=0; $z < $repeat_times; $z++  ){
+//                    array_push($this->cut_array,  $temp);
+//                }
+//            } else {/**если нет 0,5 рулона */
+//                //$y=0;
+//                do {
+//                    if ($this->initial_order[$x][6] == 0){break;};
+//                    array_push($this->cut_array,  $temp);
+//                    $y++;
+//                }while($y < $repeat_times);
+//            }
+//        }
+//        print_r($this->initial_order);
+//    }
+    public function cut_array_and_half_cut_array_init() {
+        for ($x = 0; $x < count($this->initial_order); $x++) {
             $temp = array();
             array_push($temp, $this->initial_order[$x][0]);
             array_push($temp, $this->initial_order[$x][2]);
@@ -180,24 +221,25 @@ class Planned_order
 
             $repeat_times = $this->initial_order[$x][6];
 
-            if($repeat_times - floor($repeat_times) != 0) {/** если есть 0,5 рулона */
-                /** добаляем 0,5 рулона в массив с половинами рулонов */
-                array_push($this->half_cut_array,  $temp);
-                $repeat_times = $repeat_times - 0.5;
-                $y=0;
+            if ($repeat_times - floor($repeat_times) != 0) { // есть 0.5 рулона
+                array_push($this->half_cut_array, $temp);
+                $repeat_times -= 0.5;
 
-                    for ($z=0; $z < $repeat_times; $z++  ){
-                    array_push($this->cut_array,  $temp);
+                for ($z = 0; $z < (int) $repeat_times; $z++) {
+                    array_push($this->cut_array, $temp);
                 }
-            } else {/**если нет 0,5 рулона */
-                $y=0;
-                do {
-                    if ($this->initial_order[$x][6] == 0){break;};
-                    array_push($this->cut_array,  $temp);
-                    $y++;
-                }while($y < $repeat_times);
+            } else {
+                if ($repeat_times > 0) {
+                    $y = 0;
+                    do {
+                        array_push($this->cut_array, $temp);
+                        $y++;
+                    } while ($y < (int) $repeat_times);
+                }
             }
         }
+
+        // print_r($this->initial_order); // Только если нужно отладить
     }
 
     /** Инициируем массив для 0,5 бухт */
