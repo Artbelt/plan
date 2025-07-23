@@ -40,10 +40,17 @@ $advertisement = 'Информация';
         }
         main {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-columns: repeat(4, 1fr);
             gap: 20px;
             padding: 20px;
         }
+
+        @media (max-width: 1200px) {
+            main {
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            }
+        }
+
         .section {
             background: white;
             border-radius: 8px;
@@ -85,6 +92,8 @@ $advertisement = 'Информация';
             padding: 10px 0;
             margin-top: 20px;
         }
+
+
     </style>
 </head>
 <body>
@@ -115,15 +124,20 @@ $advertisement = 'Информация';
         </form>
     </div>
 
-    <!-- Блок объявлений -->
+    <!-- Блок приложений -->
     <div class="section">
-        <h2>Объявления</h2>
-        <?php show_ads(); ?>
-        <form class="ads-form" action="create_ad.php" method="post">
-            <input type="text" name="title" placeholder="Название объявления" required>
-            <textarea name="content" placeholder="Введите текст" required></textarea>
-            <input type="date" name="expires_at" required>
-            <button type="submit">Создать объявление</button>
+        <h2>Приложения</h2>
+        <form action="add_filter_properties_into_db.php" method="post" target="_blank">
+            <input type="hidden" name="workshop" value="<?= htmlspecialchars($workshop) ?>">
+            <input type="submit" value="Добавить / изменить фильтр">
+        </form>
+        <form action="manufactured_production_editor.php" method="post" target="_blank">
+            <input type="hidden" name="workshop" value="<?= htmlspecialchars($workshop) ?>">
+            <input type="submit" value="Редактор внесенной продукции">
+        </form>
+        <form action="gofra_table.php" method="post" target="_blank">
+            <input type="hidden" name="workshop" value="<?= htmlspecialchars($workshop) ?>">
+            <input type="submit" value="Журнал для гофропакетчиков">
         </form>
     </div>
 
@@ -137,24 +151,38 @@ $advertisement = 'Информация';
             echo '<form action="show_order.php" method="post" target="_blank">';
             while ($orders_data = $result->fetch_assoc()) {
                 if (($workshop == $orders_data['workshop']) && ($orders_data['hide'] != 1)) {
-                    echo "<input type='submit' name='order_number' value='".$orders_data['order_number']."'>";
+                    echo "<input type='submit' class='btn-order' name='order_number' value='".$orders_data['order_number']."'>";
                 }
             }
             echo '</form>';
         }
         ?>
         <form action="archived_orders.php" target="_blank">
-            <input type="submit" value="Архив заявок">
+            <input type="submit" class="btn-order" value="Архив заявок">
         </form>
         <form action="planning_manager.php" method="post">
-            <input type="submit" value="Менеджер планирования">
+            <input type="submit" class="btn-order" value="Менеджер планирования">
         </form>
         <form enctype="multipart/form-data" action="load_file.php" method="POST">
             <input type="file" name="userfile">
-            <input type="submit" value="Загрузить заявку">
+            <input type="submit" class="btn-order" value="Загрузить заявку">
+        </form>
+    </div>
+
+
+    <!-- Блок объявлений -->
+    <div class="section">
+        <h2>Объявления</h2>
+        <?php show_ads(); ?>
+        <form class="ads-form" action="create_ad.php" method="post">
+            <input type="text" name="title" placeholder="Название объявления" required>
+            <textarea name="content" placeholder="Введите текст" required></textarea>
+            <input type="date" name="expires_at" required>
+            <button type="submit">Создать объявление</button>
         </form>
     </div>
 </main>
+
 
 <footer>
     <?= $advertisement ?>
