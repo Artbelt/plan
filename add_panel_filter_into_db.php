@@ -100,6 +100,7 @@ if (isset($_POST['analog_filter']) AND ($_POST['analog_filter'] != '')){
     echo "<p style='text-align: center'>ANALOG_FILTER = " . $analog_filter . "</p>";
     $analog_data = get_filter_data($analog_filter);
 } else {
+    $analog_filter = '';
     echo "<p style='text-align: center';>Аналог не определен</p>";
     $analog_data = array(
         'paper_package_length' => '',
@@ -118,6 +119,8 @@ if (isset($_POST['analog_filter']) AND ($_POST['analog_filter'] != '')){
         'prefilter_material' => '',
         'prefilter_supplier' => '',
         'prefilter_remark' => '',
+        'glueing' => '',
+        'glueing_remark' => '',
         'box' => '',
         'g_box' => '',
         'comment' => ''
@@ -128,7 +131,7 @@ if (isset($_POST['analog_filter']) AND ($_POST['analog_filter'] != '')){
 <form action="processing_add_panel_filter_into_db.php" method="post">
     <div class="field-group">
         <label>Наименование фильтра</label>
-        <input type="text" name="filter_name" size="40" value="<?php echo $filter_name?>">
+        <input type="text" name="filter_name" size="40" value="<?php echo $analog_filter?>">
     </div>
     <div class="field-group">
         <label>Категория</label>
@@ -199,6 +202,19 @@ if (isset($_POST['analog_filter']) AND ($_POST['analog_filter'] != '')){
     <div class="field-group">
         <label>Комментарий к предфильтру:<input type="text" size="50" name="pf_remark" value="<?php echo $analog_data['prefilter_remark'] ?>"></label>
     </div>
+    <hr>
+    <div class="section-title">Проливка:</div>
+    <select name="glueing">
+        <option></option>
+        <option <?php if ($analog_data['glueing'] == '1'){echo 'selected';} ?>>1</option>
+        <option <?php if ($analog_data['glueing'] == '2'){echo 'selected';} ?>>2</option>
+        <option <?php if ($analog_data['glueing'] == '3'){echo 'selected';} ?>>3</option>
+        <option <?php if ($analog_data['glueing'] == '4'){echo 'selected';} ?>>4</option>
+    </select>
+    <div class="field-group">
+        <label>Комментарий к проливке:<input type="text" size="50" name="glueing_remark" value="<?php echo $analog_data['glueing_remark']; ?>"></label>
+    </div>
+    </div>
 
     <hr>
     <div class="section-title">Индивидуальная упаковка:</div>
@@ -237,7 +253,7 @@ if (isset($_POST['analog_filter']) AND ($_POST['analog_filter'] != '')){
                 let newVal = this.value || "пусто";
                 if (oldVal !== newVal) {
                     let label = this.closest("label") ? this.closest("label").innerText.split(':')[0] : this.name;
-                    let msg = `- изменено ${label} с ${oldVal} на ${newVal}`;
+                    let msg = `  ${label}  : [ ${oldVal} ] => [ ${newVal} ];`;
                     let p = document.createElement("div");
                     p.textContent = msg;
                     logDiv.appendChild(p);

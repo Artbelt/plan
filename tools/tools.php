@@ -856,6 +856,17 @@ function get_filter_data($target_filter){
         $result_array['prefilter_remark'] = $prefilter_data['p_remark'];
     }
 
+    /** ПРОЛИВКА */
+    /** Выполняем запрос SQL */
+    $sql = "SELECT glueing, glueing_remark FROM panel_filter_structure WHERE filter = '".$target_filter."';";
+    /** Если запрос не удачный -> exit */
+    if (!$result = $mysqli->query($sql)){ echo "Ошибка: Наш запрос не удался и вот почему: \n Запрос: " . $sql . "\n"."Номер ошибки: " . $mysqli->errno . "\n Ошибка: " . $mysqli->error . "\n"; exit; }
+    /** Разбор массива значений  */
+    $glueing_data = $result->fetch_assoc();
+    $result_array['glueing'] = $glueing_data['glueing'];
+    $result_array['glueing_remark'] = $glueing_data['glueing_remark'];
+
+
     /** КОРОБКА ИНДИВИДУАЛЬНАЯ */
     /** Выполняем запрос SQL */
     $sql = "SELECT box FROM panel_filter_structure WHERE filter = '".$target_filter."';";
