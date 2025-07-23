@@ -1,4 +1,3 @@
-
 <?php
 $pdo = new PDO("mysql:host=127.0.0.1;dbname=plan;charset=utf8mb4", "root", "");
 $order = $_GET['order'] ?? '';
@@ -27,19 +26,32 @@ foreach ($positions as $p) {
     <meta charset="UTF-8">
     <title>Планирование сборки</title>
     <style>
-        body {     font-family: sans-serif;
-            font-size: 12px; /* 👈 уменьшен шрифт */
+        body {
+            font-family: sans-serif;
+            font-size: 12px;
             padding: 20px;
-            background: #f0f0f0; }
-        table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
-        th, td {    font-size: 11px; /* 👈 уменьшен размер шрифта в таблице */
+            background: #f0f0f0;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        th, td {
+            font-size: 11px;
             border: 1px solid #ccc;
             padding: 3px;
-            vertical-align: top; }
-        .position-cell {     cursor: pointer;
+            vertical-align: top;
+            white-space: normal !important;
+        }
+        .position-cell {
+            display: block !important;
+            margin-bottom: 2px;
+            cursor: pointer;
             padding: 2px;
-            font-size: 11px; /* 👈 уменьшен шрифт */
-            border-bottom: 1px dotted #ccc; }
+            font-size: 11px;
+            border-bottom: 1px dotted #ccc;
+        }
         .used {
             background-color: #8996d7;
             color: #333;
@@ -49,34 +61,55 @@ foreach ($positions as $p) {
             margin-bottom: 2px;
             font-size: 11px;
         }
+        .assigned-item {
+            background: #d2f5a3;
+            margin-bottom: 2px;
+            padding: 2px 4px;
+            cursor: pointer;
+            border-radius: 4px;
+            display: block;
+        }
         .drop-target { min-height: 50px; }
         .modal {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.4); justify-content: center; align-items: center;
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.4);
+            justify-content: center;
+            align-items: center;
         }
         .modal-content {
-            background: white; padding: 20px; border-radius: 5px; width: 400px;
+            background: white;
+            padding: 20px;
+            border-radius: 5px;
+            width: 400px;
         }
         .modal h3 { margin-top: 0; }
         .modal button { margin-top: 10px; }
-        .summary { font-size: 11px;
+        .summary {
+            font-size: 11px;
             font-weight: bold;
-            padding-top: 4px; }
+            padding-top: 4px;
+        }
     </style>
 </head>
 <body>
 <h2>Планирование сборки для заявки <?= htmlspecialchars($order) ?></h2>
-<form method="get">
+<form method="get" style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
     Дата начала: <input type="date" name="start" value="<?= htmlspecialchars($_GET['start'] ?? date('Y-m-d')) ?>">
     Дней: <input type="number" name="days" value="<?= $days ?>" min="1" max="30">
     <input type="hidden" name="order" value="<?= htmlspecialchars($order) ?>">
     <button type="submit">Построить таблицу</button>
+    <button type="button" onclick="addDay()">Добавить день</button>
 </form>
 
 <label>Заливок в смену: <input type="number" id="fills_per_day" value="50" min="1" style="width:60px;"></label>
 
 <h3>Доступные позиции из гофроплана</h3>
-<table>
+<table id="top-table">
     <tr>
         <?php foreach ($dates as $d): ?>
             <th><?= $d ?></th>
@@ -86,12 +119,16 @@ foreach ($positions as $p) {
         <?php foreach ($dates as $d): ?>
             <td>
                 <?php foreach ($by_date[$d] ?? [] as $label): ?>
-
                     <?php
                     $tooltip = $label;
-                    $short = preg_replace('/\[\d+]\s+\d+(\.\d+)?$/', '', $label); // убираем [48] 199 в конце
+                    $short = preg_replace('/\[\d+]\s+\d+(\.\d+)?$/', '', $label);
+                    $uniqueId = uniqid('pos_');
                     ?>
-                    <div class="position-cell" title="<?= htmlspecialchars($tooltip) ?>" data-label="<?= htmlspecialchars($label) ?>" data-cut-date="<?= $d ?>">
+                    <div class="position-cell"
+                         data-id="<?= $uniqueId ?>"
+                         title="<?= htmlspecialchars($tooltip) ?>"
+                         data-label="<?= htmlspecialchars($label) ?>"
+                         data-cut-date="<?= $d ?>">
                         <?= htmlspecialchars($short) ?>
                     </div>
                 <?php endforeach; ?>
@@ -103,7 +140,7 @@ foreach ($positions as $p) {
 <h3>Планирование сборки</h3>
 <form method="post" action="NP/save_build_plan.php">
     <input type="hidden" name="order" value="<?= htmlspecialchars($order) ?>">
-    <table>
+    <table id="bottom-table">
         <tr>
             <?php foreach ($dates as $d): ?>
                 <th><?= $d ?></th>
@@ -135,11 +172,13 @@ foreach ($positions as $p) {
 <script>
     let selectedLabel = '';
     let selectedCutDate = '';
+    let selectedId = '';
 
     function closeModal() {
         document.getElementById("modal").style.display = "none";
         selectedLabel = '';
         selectedCutDate = '';
+        selectedId = '';
     }
 
     function updateSummary(date) {
@@ -155,14 +194,34 @@ foreach ($positions as $p) {
             items.length + " позиций, " + totalFilters + " фильтров";
     }
 
+    function attachRemoveHandlers() {
+        document.querySelectorAll('.assigned-item').forEach(div => {
+            div.onclick = () => {
+                const posId = div.getAttribute('data-id');
+
+                // Снимаем выделение с верхней позиции
+                const upperCell = document.querySelector('.position-cell.used[data-id="' + posId + '"]');
+                if (upperCell) {
+                    upperCell.classList.remove('used');
+                }
+
+                // Удаляем все части этой позиции из нижней таблицы
+                document.querySelectorAll('.assigned-item[data-id="' + posId + '"]').forEach(item => {
+                    const parentDate = item.closest('.drop-target').dataset.date;
+                    item.remove();
+                    updateSummary(parentDate);
+                });
+            };
+        });
+    }
 
     document.querySelectorAll('.position-cell').forEach(cell => {
         cell.addEventListener('click', () => {
             if (cell.classList.contains('used')) return;
             selectedLabel = cell.dataset.label;
             selectedCutDate = cell.dataset.cutDate;
+            selectedId = cell.dataset.id;
 
-            // Отобразим модальное окно
             const modalDates = document.getElementById("modal-dates");
             modalDates.innerHTML = "";
 
@@ -200,17 +259,55 @@ foreach ($positions as $p) {
             const div = document.createElement('div');
 
             const filterName = selectedLabel.split('[')[0].trim();
-            div.innerText = `${filterName}`;
-            div.setAttribute('data-filters', batch);  // 👈 Сохраняем кол-во фильтров
+            div.innerText = `${filterName} (${batch})`;
+            div.setAttribute('data-filters', batch);
+            div.setAttribute('data-id', selectedId);
+            div.classList.add('assigned-item');
 
             targets[i].appendChild(div);
             updateSummary(targets[i].dataset.date);
+            attachRemoveHandlers();
             total -= batch;
             i++;
         }
     }
 
+    function addDay() {
+        const topTable = document.getElementById('top-table');
+        const bottomTable = document.getElementById('bottom-table');
 
+        const lastDateCell = topTable.querySelector('tr th:last-child');
+        const lastDate = new Date(lastDateCell.innerText);
+        lastDate.setDate(lastDate.getDate() + 1);
+        const newDateStr = lastDate.toISOString().slice(0, 10);
+
+        const topHead = topTable.querySelector('tr');
+        const newTopTh = document.createElement('th');
+        newTopTh.innerText = newDateStr;
+        topHead.appendChild(newTopTh);
+
+        const topRow = topTable.querySelector('tr:nth-of-type(2)');
+        const newTopTd = document.createElement('td');
+        topRow.appendChild(newTopTd);
+
+        const bottomHead = bottomTable.querySelector('tr');
+        const newBottomTh = document.createElement('th');
+        newBottomTh.innerText = newDateStr;
+        bottomHead.appendChild(newBottomTh);
+
+        const bottomRow = bottomTable.querySelector('tr:nth-of-type(2)');
+        const newBottomTd = document.createElement('td');
+        newBottomTd.classList.add('drop-target');
+        newBottomTd.setAttribute('data-date', newDateStr);
+        bottomRow.appendChild(newBottomTd);
+
+        const summaryRow = bottomTable.querySelector('tr:nth-of-type(3)');
+        const newSummaryTd = document.createElement('td');
+        newSummaryTd.classList.add('summary');
+        newSummaryTd.id = "summary-" + newDateStr;
+        newSummaryTd.innerText = "0 позиций, 0 фильтров";
+        summaryRow.appendChild(newSummaryTd);
+    }
 
     function preparePlan() {
         const data = {};
