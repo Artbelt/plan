@@ -32,6 +32,10 @@ $pf_name     = ($pf_length && $pf_width && $pf_material && $pf_supplier) ? "пр
 $glueing        = $_POST['glueing'] ?? '';
 $glueing_remark = $_POST['glueing_remark'] ?? '';
 
+/** ФОРМ-ФАКТОР */
+$form_factor_id     = $_POST['form_factor'] ?? '';
+$form_factor_remark = $_POST['form_factor_remark'] ?? '';
+
 /** УПАКОВКА */
 $box    = $_POST['box'];
 $g_box  = $_POST['g_box'];
@@ -46,8 +50,12 @@ $user_name   = $_SESSION['user_name'] ?? 'Гость';
 $a = check_filter($filter_name);
 
 /** === panel_filter_structure === */
-$sql = "INSERT INTO panel_filter_structure (filter, category, paper_package, wireframe, prefilter, glueing, glueing_remark, box, g_box, comment)
-        VALUES ('$filter_name','$category','$p_p_name','$wf_name','$pf_name','$glueing', '$glueing_remark','$box','$g_box','$remark')
+$sql = "INSERT INTO panel_filter_structure 
+        (filter, category, paper_package, wireframe, prefilter, glueing, glueing_remark, 
+         form_factor_id, form_factor_remark, box, g_box, comment)
+        VALUES 
+        ('$filter_name','$category','$p_p_name','$wf_name','$pf_name','$glueing',
+         '$glueing_remark','$form_factor_id','$form_factor_remark','$box','$g_box','$remark')
         ON DUPLICATE KEY UPDATE
             category = VALUES(category),
             paper_package = VALUES(paper_package),
@@ -55,14 +63,18 @@ $sql = "INSERT INTO panel_filter_structure (filter, category, paper_package, wir
             prefilter = VALUES(prefilter),
             glueing = VALUES(glueing),
             glueing_remark = VALUES(glueing_remark),
+            form_factor_id = VALUES(form_factor_id),
+            form_factor_remark = VALUES(form_factor_remark),
             box = VALUES(box),
             g_box = VALUES(g_box),
             comment = VALUES(comment);";
 mysql_execute($sql);
 
 /** === paper_package_panel === */
-$sql = "INSERT INTO paper_package_panel (p_p_name, p_p_length, p_p_height, p_p_width, p_p_pleats_count, p_p_amplifier, supplier, p_p_remark)
-        VALUES ('$p_p_name','$p_p_length','$p_p_height','$p_p_width','$p_p_pleats_count','$p_p_amplifier','$p_p_supplier','$p_p_remark')
+$sql = "INSERT INTO paper_package_panel 
+        (p_p_name, p_p_length, p_p_height, p_p_width, p_p_pleats_count, p_p_amplifier, supplier, p_p_remark)
+        VALUES 
+        ('$p_p_name','$p_p_length','$p_p_height','$p_p_width','$p_p_pleats_count','$p_p_amplifier','$p_p_supplier','$p_p_remark')
         ON DUPLICATE KEY UPDATE
             p_p_length = VALUES(p_p_length),
             p_p_height = VALUES(p_p_height),
