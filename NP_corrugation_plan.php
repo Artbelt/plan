@@ -11,21 +11,31 @@ for ($i = 0; $i < $days; $i++) {
     $start_date->modify('+1 day');
 }
 
-// Получение позиций из раскроя
+// Получение позиций из раскроя с полями glueing, prefilter и form_factor
 $stmt = $pdo->prepare("
     SELECT rp.plan_date, c.filter, c.height, c.width, c.length, p.paper_package, 
-           pp.p_p_height, pp.p_p_pleats_count
+           pp.p_p_height, pp.p_p_pleats_count, p.glueing, p.prefilter, f.name AS form_factor
     FROM cut_plans c
     JOIN roll_plan rp ON c.bale_id = rp.bale_id AND rp.order_number = c.order_number
     JOIN panel_filter_structure p ON p.filter = c.filter
     JOIN paper_package_panel pp ON pp.p_p_name = p.paper_package
+    LEFT JOIN form_factors f ON p.form_factor_id = f.id
     WHERE c.order_number = ?
 ");
 $stmt->execute([$order]);
 $positions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $by_date = [];
 foreach ($positions as $p) {
-    $label = "{$p['filter']} [{$p['height']}] {$p['width']}";
+    $icons = '';
+    if (!empty($p['glueing'])) $icons .= ' <span class="icon" title="Проливка">●</span>';
+    if (!empty($p['prefilter'])) $icons .= ' <span class="icon" title="Предфильтр">◩</span>';
+    if ($p['form_factor'] === 'трапеция') {
+        $icons .= ' <span class="icon" title="Трапеция">⏃</span>';
+    } elseif ($p['form_factor'] === 'трапеция с обечайкой') {
+        $icons .= ' <span class="icon" title="Трапеция с обечайкой">⏃◯</span>';
+    }
+
+    $label = "{$p['filter']} [{$p['height']}] {$p['width']} $icons";
     $by_date[$p['plan_date']][] = [
         'label' => $label,
         'cut_date' => $p['plan_date'],
@@ -44,13 +54,13 @@ foreach ($positions as $p) {
     <style>
         body { font-family: sans-serif; padding: 20px; background: #f0f0f0; font-size: 13px; }
         table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
-        th, td { border: 1px solid #ccc; padding: 5px; vertical-align: top; }
+        th, td { border: 1px solid #ccc; padding: 5px; vertical-align: top; white-space: normal; }
         .position-cell {
             cursor: pointer;
             padding: 3px;
             border-bottom: 1px dotted #ccc;
-            display: block;        /* каждая позиция на новой строке */
-            margin-bottom: 2px;    /* небольшой отступ между строками */
+            display: block;
+            margin-bottom: 2px;
         }
         .used {
             background-color: #8996d7;
@@ -73,6 +83,8 @@ foreach ($positions as $p) {
         .modal h3 { margin-top: 0; }
         .modal button { margin-top: 10px; }
         .summary { font-weight: bold; padding-top: 5px; }
+        .icon { font-size: 14px; margin-left: 4px; }
+        .legend { margin-bottom: 10px; font-size: 13px; }
     </style>
 </head>
 <body>
@@ -85,7 +97,12 @@ foreach ($positions as $p) {
     <button type="button" onclick="addDay()">Добавить день</button>
 </form>
 
+
+
 <h3>Доступные позиции из раскроя</h3>
+<div class="legend">
+    Проливка ● | Предфильтр ◩ | Трапеция ⏃ | Трапеция с обечайкой ⏃◯
+</div>
 <table id="top-table">
     <tr>
         <?php foreach ($dates as $d): ?>
@@ -99,12 +116,12 @@ foreach ($positions as $p) {
                     <?php $uniqueId = uniqid('pos_'); ?>
                     <div class="position-cell"
                          data-id="<?= $uniqueId ?>"
-                         data-filter="<?= htmlspecialchars($item['label']) ?>"
+                         data-filter="<?= htmlspecialchars(strip_tags($item['label'])) ?>"
                          data-cut-date="<?= $item['cut_date'] ?>"
                          data-length="<?= $item['length'] ?>"
                          data-pleats="<?= $item['pleats'] ?>"
                          data-pleat-height="<?= $item['pleat_height'] ?>">
-                        <?= htmlspecialchars($item['label']) ?>
+                        <?= $item['label'] ?>
                     </div>
                 <?php endforeach; ?>
             </td>
@@ -232,7 +249,6 @@ foreach ($positions as $p) {
         lastDate.setDate(lastDate.getDate() + 1);
         const newDateStr = lastDate.toISOString().slice(0, 10);
 
-        // Добавляем столбец в верхнюю таблицу
         const topHead = topTable.querySelector('tr');
         const newTopTh = document.createElement('th');
         newTopTh.innerText = newDateStr;
@@ -242,7 +258,6 @@ foreach ($positions as $p) {
         const newTopTd = document.createElement('td');
         topRow.appendChild(newTopTd);
 
-        // Добавляем столбец в нижнюю таблицу
         const bottomHead = bottomTable.querySelector('tr');
         const newBottomTh = document.createElement('th');
         newBottomTh.innerText = newDateStr;

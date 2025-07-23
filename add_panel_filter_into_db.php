@@ -1,5 +1,9 @@
 <?php
 require_once('tools/tools.php');
+
+// Загружаем список форм-факторов из БД
+$pdo = new PDO("mysql:host=127.0.0.1;dbname=plan;charset=utf8mb4", "root", "");
+$form_factors = $pdo->query("SELECT id, name FROM form_factors ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
 <html lang="ru">
@@ -119,11 +123,13 @@ if (isset($_POST['analog_filter']) AND ($_POST['analog_filter'] != '')){
         'prefilter_material' => '',
         'prefilter_supplier' => '',
         'prefilter_remark' => '',
+        'form_factor_id' => '',
+        'form_factor_remark' => '',
         'glueing' => '',
         'glueing_remark' => '',
         'box' => '',
         'g_box' => '',
-        'comment' => ''
+        'comment' => ''  // добавлено
     );
 }
 ?>
@@ -214,6 +220,19 @@ if (isset($_POST['analog_filter']) AND ($_POST['analog_filter'] != '')){
     <div class="field-group">
         <label>Комментарий к проливке:<input type="text" size="50" name="glueing_remark" value="<?php echo $analog_data['glueing_remark']; ?>"></label>
     </div>
+    <hr>
+    <div class="section-title">Форм-фактор:</div>
+    <select name="form_factor">
+        <option value="">-- Выберите форм-фактор --</option>
+        <?php foreach ($form_factors as $ff): ?>
+            <option value="<?= htmlspecialchars($ff['id']) ?>"
+                <?= ($analog_data['form_factor_id'] == $ff['id']) ? 'selected' : '' ?>>
+                <?= htmlspecialchars($ff['name']) ?>
+            </option>
+        <?php endforeach; ?>
+    </select>
+    <div class="field-group">
+        <label>Комментарий к форм-фактору:<input type="text" size="50" name="form_factor_remark" value="<?php echo $analog_data['form_factor_remark'] ?? ''; ?>"></label>
     </div>
 
     <hr>

@@ -866,6 +866,15 @@ function get_filter_data($target_filter){
     $result_array['glueing'] = $glueing_data['glueing'];
     $result_array['glueing_remark'] = $glueing_data['glueing_remark'];
 
+    /** ФОРМ-ФАКТОР */
+    /** Выполняем запрос SQL */
+    $sql = "SELECT form_factor_id, form_factor_remark FROM panel_filter_structure WHERE filter = '".$target_filter."';";
+    /** Если запрос не удачный -> exit */
+    if (!$result = $mysqli->query($sql)){ echo "Ошибка: Наш запрос не удался и вот почему: \n Запрос: " . $sql . "\n"."Номер ошибки: " . $mysqli->errno . "\n Ошибка: " . $mysqli->error . "\n"; exit; }
+    /** Разбор массива значений  */
+    $form_factor_data = $result->fetch_assoc();
+    $result_array['form_factor_id'] = $form_factor_data['form_factor_id'];
+    $result_array['form_factor_remark'] = $form_factor_data['form_factor_remark'];
 
     /** КОРОБКА ИНДИВИДУАЛЬНАЯ */
     /** Выполняем запрос SQL */
