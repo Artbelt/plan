@@ -136,7 +136,7 @@ foreach ($positions as $p) {
         selectedCutDate = '';
         selectedId = '';
         selectedDate = '';
-        document.getElementById("modal-places").innerHTML = ""; // Очистка кнопок мест
+        document.getElementById("modal-places").innerHTML = "";
     }
 
     function attachRemoveHandlers() {
@@ -165,7 +165,7 @@ foreach ($positions as $p) {
                     btn.innerText = th.innerText;
                     btn.onclick = () => {
                         selectedDate = th.innerText;
-                        renderPlaces();
+                        renderPlacesForDate(selectedDate);
                     };
                     modalDates.appendChild(btn);
                 }
@@ -175,18 +175,28 @@ foreach ($positions as $p) {
         });
     });
 
-    function renderPlaces() {
+    function renderPlacesForDate(date) {
         const modalPlaces = document.getElementById("modal-places");
         modalPlaces.innerHTML = "";
+
         for (let i = 1; i <= 17; i++) {
             const btn = document.createElement("button");
             btn.innerText = "Место " + i;
-            btn.onclick = () => {
-                distributeToBuildPlan(selectedDate, i);
-                const cell = document.querySelector('.position-cell[data-id="' + selectedId + '"]');
-                if (cell) cell.classList.add('used');
-                closeModal(); // Закрыть окно после выбора
-            };
+
+            const td = document.querySelector(`.drop-target[data-date='${date}'][data-place='${i}']`);
+            const isOccupied = td && td.querySelector('.assigned-item');
+
+            if (isOccupied) {
+                btn.disabled = true;
+                btn.style.opacity = "0.5";
+            } else {
+                btn.onclick = () => {
+                    distributeToBuildPlan(date, i);
+                    const cell = document.querySelector('.position-cell[data-id="' + selectedId + '"]');
+                    if (cell) cell.classList.add('used');
+                    closeModal();
+                };
+            }
             modalPlaces.appendChild(btn);
         }
     }
