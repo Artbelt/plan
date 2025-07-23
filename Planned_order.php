@@ -72,7 +72,7 @@ class Planned_order
             echo '<input type="hidden" name="workshop" value="U2">';
             echo '<input type="hidden" name="filter_name" value="'.$not_excist_filters[$x].'">';
             echo $not_excist_filters[$x]."==>";
-            load_filters_into_select();
+            load_filters_into_select('выбор аналога');
             echo '<input type="submit" value="Добавить в БД"><br>';
             echo '</form>';
         }

@@ -225,7 +225,7 @@ function load_orders($list, $selection, $form){
     $mysqli->close();
 }
 /** СОздание <SELECT> списка с перечнем фильтров имеющихся в БД */
-function load_filters_into_select(){
+function load_filters_into_select($text){
 
     global $mysql_host,$mysql_user,$mysql_user_pass,$mysql_database;
 
@@ -242,7 +242,7 @@ function load_filters_into_select(){
 
     /** Разбор массива значений  */
     echo "<select name='analog_filter'>";
-    echo "<option value=''>выбор аналога</option>";
+    echo "<option value=''>".$text."</option>";
     while ($orders_data = $result->fetch_assoc()){
         echo "<option value=".$orders_data['filter'].">".$orders_data['filter']."</option>";
     }

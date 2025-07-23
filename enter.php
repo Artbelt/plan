@@ -186,20 +186,14 @@ echo "<tr align='center'><td>"
         ."</form>"
     */
         /** Добавление полной информации по фильтру  */
-        . "<form action='add_panel_filter_into_db.php' method='post'>"
+        . "<form action='add_filter_properties_into_db.php' method='post' target='_blank'>"
         ."<input type='hidden' name='workshop' value='$workshop'>"
-        ."<input type='submit'  value='добавить фильтр в БД(full)'  style=\"height: 20px; width: 220px\">"
+        ."<input type='submit'  value='добавить/изменить фильтр'  style=\"height: 20px; width: 220px\">"
         ."</form>"
-
-        ."<form action='add_filter_properties_into_db.php' method='post'>"
-        ."<input type='hidden' name='workshop' value='$workshop'>"
-        ."<input type='submit'  value='изменить параметры фильтра'  style=\"height: 20px; width: 220px\">"
-        ."</form>"
-
-    ."<form action='manufactured_production_editor.php' method='post' target='_blank'>"
-    ."<input type='hidden' name='workshop' value='U2'>"
-    ."<input type='submit'  value='Редактор внесенной продукции'  style=\"height: 20px; width: 220px\">"
-    ."</form>";
+        ."<form action='manufactured_production_editor.php' method='post' target='_blank'>"
+        ."<input type='hidden' name='workshop' value='U2'>"
+        ."<input type='submit'  value='Редактор внесенной продукции'  style=\"height: 20px; width: 220px\">"
+        ."</form>";
 
         ?>
 
