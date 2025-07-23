@@ -45,7 +45,13 @@ foreach ($positions as $p) {
         body { font-family: sans-serif; padding: 20px; background: #f0f0f0; font-size: 13px; }
         table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
         th, td { border: 1px solid #ccc; padding: 5px; vertical-align: top; }
-        .position-cell { cursor: pointer; padding: 3px; border-bottom: 1px dotted #ccc; }
+        .position-cell {
+            cursor: pointer;
+            padding: 3px;
+            border-bottom: 1px dotted #ccc;
+            display: block;        /* каждая позиция на новой строке */
+            margin-bottom: 2px;    /* небольшой отступ между строками */
+        }
         .used {
             background-color: #8996d7;
             color: #333;
@@ -55,6 +61,7 @@ foreach ($positions as $p) {
             margin-bottom: 2px;
             font-size: 13px;
         }
+        .assigned-item { background: #d2f5a3; margin-bottom: 2px; padding: 2px 4px; cursor: pointer; border-radius: 4px; }
         .drop-target { min-height: 50px; }
         .modal {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
@@ -70,15 +77,16 @@ foreach ($positions as $p) {
 </head>
 <body>
 <h2>Планирование гофрирования для заявки <?= htmlspecialchars($order) ?></h2>
-<form method="get">
+<form method="get" style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
     Дата начала: <input type="date" name="start" value="<?= htmlspecialchars($_GET['start'] ?? date('Y-m-d')) ?>">
     Дней: <input type="number" name="days" value="<?= $days ?>" min="1" max="30">
     <input type="hidden" name="order" value="<?= htmlspecialchars($order) ?>">
     <button type="submit">Построить таблицу</button>
+    <button type="button" onclick="addDay()">Добавить день</button>
 </form>
 
 <h3>Доступные позиции из раскроя</h3>
-<table>
+<table id="top-table">
     <tr>
         <?php foreach ($dates as $d): ?>
             <th><?= $d ?></th>
@@ -88,7 +96,9 @@ foreach ($positions as $p) {
         <?php foreach ($dates as $d): ?>
             <td>
                 <?php foreach ($by_date[$d] ?? [] as $item): ?>
+                    <?php $uniqueId = uniqid('pos_'); ?>
                     <div class="position-cell"
+                         data-id="<?= $uniqueId ?>"
                          data-filter="<?= htmlspecialchars($item['label']) ?>"
                          data-cut-date="<?= $item['cut_date'] ?>"
                          data-length="<?= $item['length'] ?>"
@@ -105,7 +115,7 @@ foreach ($positions as $p) {
 <h3>Планирование гофрирования</h3>
 <form method="post" action="NP/save_corrugation_plan.php">
     <input type="hidden" name="order" value="<?= htmlspecialchars($order) ?>">
-    <table>
+    <table id="bottom-table">
         <tr>
             <?php foreach ($dates as $d): ?>
                 <th><?= $d ?></th>
@@ -152,11 +162,27 @@ foreach ($positions as $p) {
         document.getElementById("summary-" + date).innerText = total + " шт";
     }
 
+    function attachRemoveHandlers() {
+        document.querySelectorAll('.assigned-item').forEach(div => {
+            div.onclick = () => {
+                const posId = div.getAttribute('data-id');
+                const upperCell = document.querySelector('.position-cell.used[data-id="' + posId + '"]');
+                if (upperCell) {
+                    upperCell.classList.remove('used');
+                }
+                const parentDate = div.closest('.drop-target').dataset.date;
+                div.remove();
+                updateSummary(parentDate);
+            };
+        });
+    }
+
     document.querySelectorAll('.position-cell').forEach(cell => {
         cell.addEventListener('click', () => {
             if (cell.classList.contains('used')) return;
 
             selectedData = {
+                id: cell.dataset.id,
                 label: cell.dataset.filter,
                 cutDate: cell.dataset.cutDate,
                 length: parseFloat(cell.dataset.length),
@@ -180,11 +206,15 @@ foreach ($positions as $p) {
 
                         const div = document.createElement('div');
                         div.innerText = selectedData.label + " (" + qty + " шт)";
+                        div.classList.add('assigned-item');
                         div.setAttribute("data-qty", qty);
+                        div.setAttribute("data-label", selectedData.label);
+                        div.setAttribute("data-id", selectedData.id);
                         td.appendChild(div);
 
                         cell.classList.add('used');
                         updateSummary(date);
+                        attachRemoveHandlers();
                         closeModal();
                     };
                     modalDates.appendChild(btn);
@@ -192,6 +222,45 @@ foreach ($positions as $p) {
             });
         });
     });
+
+    function addDay() {
+        const topTable = document.getElementById('top-table');
+        const bottomTable = document.getElementById('bottom-table');
+
+        const lastDateCell = topTable.querySelector('tr th:last-child');
+        const lastDate = new Date(lastDateCell.innerText);
+        lastDate.setDate(lastDate.getDate() + 1);
+        const newDateStr = lastDate.toISOString().slice(0, 10);
+
+        // Добавляем столбец в верхнюю таблицу
+        const topHead = topTable.querySelector('tr');
+        const newTopTh = document.createElement('th');
+        newTopTh.innerText = newDateStr;
+        topHead.appendChild(newTopTh);
+
+        const topRow = topTable.querySelector('tr:nth-of-type(2)');
+        const newTopTd = document.createElement('td');
+        topRow.appendChild(newTopTd);
+
+        // Добавляем столбец в нижнюю таблицу
+        const bottomHead = bottomTable.querySelector('tr');
+        const newBottomTh = document.createElement('th');
+        newBottomTh.innerText = newDateStr;
+        bottomHead.appendChild(newBottomTh);
+
+        const bottomRow = bottomTable.querySelector('tr:nth-of-type(2)');
+        const newBottomTd = document.createElement('td');
+        newBottomTd.classList.add('drop-target');
+        newBottomTd.setAttribute('data-date', newDateStr);
+        bottomRow.appendChild(newBottomTd);
+
+        const summaryRow = bottomTable.querySelector('.summary-row');
+        const newSummaryTd = document.createElement('td');
+        newSummaryTd.classList.add('summary');
+        newSummaryTd.id = "summary-" + newDateStr;
+        newSummaryTd.innerText = "0 шт";
+        summaryRow.appendChild(newSummaryTd);
+    }
 
     function preparePlan() {
         const data = {};
