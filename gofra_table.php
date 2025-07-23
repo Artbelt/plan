@@ -16,7 +16,10 @@ SELECT
     ppp.p_p_width AS 'Ширина гофропакета',
     ppp.p_p_length AS 'Длина гофропакета',
     ppp.p_p_pleats_count AS 'Количество ребер гофропакета',
+    ppp.p_p_remark AS 'Примечания гофропакета',
     pfs.glueing AS 'Проливка',
+    pfs.form_factor_remark AS 'Примечание к форме',
+    pfs.glueing_remark AS 'Примечание к проливке',
     pf.p_name AS 'Предфильтр',
     CONCAT_WS('  ', pfs.comment, ppp.p_p_remark, pf.p_remark) AS 'Примечания'
 FROM panel_filter_structure pfs
@@ -89,7 +92,11 @@ if (!$result) {
             <td><?= htmlspecialchars($row['Количество ребер гофропакета']) ?></td>
             <td><?= htmlspecialchars($row['Проливка']) ?></td>
             <td><?= htmlspecialchars($row['Предфильтр']) ?></td>
-            <td><?= htmlspecialchars($row['Примечания']) ?></td>
+            <td><?= htmlspecialchars($row['Примечания']) ?>
+                <?= htmlspecialchars($row['Примечание к форме']) ?>
+                <?= htmlspecialchars($row['Примечание к проливке']) ?>
+                <?= htmlspecialchars($row['Примечания гофропакета']) ?>
+            </td>
         </tr>
     <?php endwhile; ?>
     </tbody>

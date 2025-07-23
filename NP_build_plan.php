@@ -43,9 +43,10 @@ foreach ($positions as $p) {
             padding: 3px;
             vertical-align: top;
             white-space: normal !important;
+            text-align: center;
         }
         .position-cell {
-            display: block !important;
+            display: block;
             margin-bottom: 2px;
             cursor: pointer;
             padding: 2px;
@@ -69,7 +70,7 @@ foreach ($positions as $p) {
             border-radius: 4px;
             display: block;
         }
-        .drop-target { min-height: 50px; }
+        .drop-target { min-height: 20px; height: 25px; }
         .modal {
             display: none;
             position: fixed;
@@ -146,12 +147,15 @@ foreach ($positions as $p) {
                 <th><?= $d ?></th>
             <?php endforeach; ?>
         </tr>
-        <tr>
-            <?php foreach ($dates as $d): ?>
-                <td class="drop-target" data-date="<?= $d ?>"></td>
-            <?php endforeach; ?>
-        </tr>
-        <tr>
+        <!-- Генерируем 17 строк для мест на сборочном столе -->
+        <?php for ($i = 0; $i < 17; $i++): ?>
+            <tr>
+                <?php foreach ($dates as $d): ?>
+                    <td class="drop-target" data-date="<?= $d ?>" data-row="<?= $i ?>"></td>
+                <?php endforeach; ?>
+            </tr>
+        <?php endfor; ?>
+        <tr class="summary-row">
             <?php foreach ($dates as $d): ?>
                 <td class="summary" id="summary-<?= $d ?>">0 позиций, 0 фильтров</td>
             <?php endforeach; ?>
@@ -182,30 +186,27 @@ foreach ($positions as $p) {
     }
 
     function updateSummary(date) {
-        const td = document.querySelector('.drop-target[data-date="' + date + '"]');
-        const items = Array.from(td.querySelectorAll('div'));
-
-        const totalFilters = items.reduce((sum, div) => {
-            const count = parseFloat(div.getAttribute('data-filters') || "0");
-            return sum + count;
-        }, 0);
-
+        let totalPositions = 0;
+        let totalFilters = 0;
+        document.querySelectorAll(`.drop-target[data-date="${date}"]`).forEach(td => {
+            const div = td.querySelector('div');
+            if (div) {
+                totalPositions++;
+                totalFilters += parseFloat(div.getAttribute('data-filters') || "0");
+            }
+        });
         document.getElementById("summary-" + date).innerText =
-            items.length + " позиций, " + totalFilters + " фильтров";
+            `${totalPositions} позиций, ${totalFilters} фильтров`;
     }
 
     function attachRemoveHandlers() {
         document.querySelectorAll('.assigned-item').forEach(div => {
             div.onclick = () => {
                 const posId = div.getAttribute('data-id');
-
-                // Снимаем выделение с верхней позиции
                 const upperCell = document.querySelector('.position-cell.used[data-id="' + posId + '"]');
                 if (upperCell) {
                     upperCell.classList.remove('used');
                 }
-
-                // Удаляем все части этой позиции из нижней таблицы
                 document.querySelectorAll('.assigned-item[data-id="' + posId + '"]').forEach(item => {
                     const parentDate = item.closest('.drop-target').dataset.date;
                     item.remove();
@@ -250,25 +251,34 @@ foreach ($positions as $p) {
         let total = parseFloat(match[2]);
         const fillsPerDay = parseInt(document.getElementById("fills_per_day").value || "50");
 
-        const targets = Array.from(document.querySelectorAll('.drop-target')).filter(td =>
-            td.dataset.date >= startDate
-        );
-        let i = 0;
-        while (total > 0 && i < targets.length) {
-            const batch = Math.min(total, fillsPerDay);
-            const div = document.createElement('div');
+        const dayColumns = Array.from(document.querySelectorAll(`.drop-target[data-date]`))
+            .reduce((acc, td) => {
+                const date = td.dataset.date;
+                if (!acc[date]) acc[date] = [];
+                acc[date].push(td);
+                return acc;
+            }, {});
 
-            const filterName = selectedLabel.split('[')[0].trim();
-            div.innerText = `${filterName} (${batch})`;
-            div.setAttribute('data-filters', batch);
-            div.setAttribute('data-id', selectedId);
-            div.classList.add('assigned-item');
+        const availableDates = Object.keys(dayColumns).filter(date => date >= startDate);
+        for (let d of availableDates) {
+            let cells = dayColumns[d];
+            for (let cell of cells) {
+                if (!cell.innerHTML && total > 0) {
+                    const batch = Math.min(total, fillsPerDay);
+                    const div = document.createElement('div');
+                    const filterName = selectedLabel.split('[')[0].trim();
+                    div.innerText = `${filterName} (${batch})`;
+                    div.setAttribute('data-filters', batch);
+                    div.setAttribute('data-id', selectedId);
+                    div.classList.add('assigned-item');
 
-            targets[i].appendChild(div);
-            updateSummary(targets[i].dataset.date);
-            attachRemoveHandlers();
-            total -= batch;
-            i++;
+                    cell.appendChild(div);
+                    updateSummary(d);
+                    attachRemoveHandlers();
+                    total -= batch;
+                    if (total <= 0) return;
+                }
+            }
         }
     }
 
@@ -281,6 +291,7 @@ foreach ($positions as $p) {
         lastDate.setDate(lastDate.getDate() + 1);
         const newDateStr = lastDate.toISOString().slice(0, 10);
 
+        // Верхняя таблица
         const topHead = topTable.querySelector('tr');
         const newTopTh = document.createElement('th');
         newTopTh.innerText = newDateStr;
@@ -290,18 +301,22 @@ foreach ($positions as $p) {
         const newTopTd = document.createElement('td');
         topRow.appendChild(newTopTd);
 
-        const bottomHead = bottomTable.querySelector('tr');
+        // Нижняя таблица
+        const bottomHead = bottomTable.querySelector('tr:first-child');
         const newBottomTh = document.createElement('th');
         newBottomTh.innerText = newDateStr;
         bottomHead.appendChild(newBottomTh);
 
-        const bottomRow = bottomTable.querySelector('tr:nth-of-type(2)');
-        const newBottomTd = document.createElement('td');
-        newBottomTd.classList.add('drop-target');
-        newBottomTd.setAttribute('data-date', newDateStr);
-        bottomRow.appendChild(newBottomTd);
+        const allRows = bottomTable.querySelectorAll('tr');
+        for (let i = 1; i <= 17; i++) {
+            const newTd = document.createElement('td');
+            newTd.classList.add('drop-target');
+            newTd.setAttribute('data-date', newDateStr);
+            newTd.setAttribute('data-row', i - 1);
+            allRows[i].appendChild(newTd);
+        }
 
-        const summaryRow = bottomTable.querySelector('tr:nth-of-type(3)');
+        const summaryRow = bottomTable.querySelector('.summary-row');
         const newSummaryTd = document.createElement('td');
         newSummaryTd.classList.add('summary');
         newSummaryTd.id = "summary-" + newDateStr;
@@ -313,11 +328,14 @@ foreach ($positions as $p) {
         const data = {};
         document.querySelectorAll('.drop-target').forEach(td => {
             const date = td.getAttribute('data-date');
-            const items = Array.from(td.querySelectorAll('div')).map(d => ({
-                label: d.innerText,
-                count: parseFloat(d.getAttribute('data-filters') || "0")
-            }));
-            if (items.length > 0) data[date] = items;
+            const div = td.querySelector('div');
+            if (div) {
+                if (!data[date]) data[date] = [];
+                data[date].push({
+                    label: div.innerText,
+                    count: parseFloat(div.getAttribute('data-filters') || "0")
+                });
+            }
         });
         document.getElementById('plan_data').value = JSON.stringify(data);
     }
