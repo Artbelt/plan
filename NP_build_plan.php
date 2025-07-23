@@ -26,75 +26,22 @@ foreach ($positions as $p) {
     <meta charset="UTF-8">
     <title>Планирование сборки</title>
     <style>
-        body {
-            font-family: sans-serif;
-            font-size: 12px;
-            padding: 20px;
-            background: #f0f0f0;
-        }
-        table {
-            border-collapse: collapse;
-            width: 100%;
-            margin-bottom: 20px;
-        }
-        th, td {
-            font-size: 11px;
-            border: 1px solid #ccc;
-            padding: 3px;
-            vertical-align: top;
-            white-space: normal !important;
-            text-align: center;
-        }
-        .position-cell {
-            display: block;
-            margin-bottom: 2px;
-            cursor: pointer;
-            padding: 2px;
-            font-size: 11px;
-            border-bottom: 1px dotted #ccc;
-        }
-        .used {
-            background-color: #8996d7;
-            color: #333;
-            border-radius: 4px;
-            padding: 2px 4px;
-            display: inline-block;
-            margin-bottom: 2px;
-            font-size: 11px;
-        }
-        .assigned-item {
-            background: #d2f5a3;
-            margin-bottom: 2px;
-            padding: 2px 4px;
-            cursor: pointer;
-            border-radius: 4px;
-            display: block;
-        }
-        .drop-target { min-height: 20px; height: 25px; }
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.4);
-            justify-content: center;
-            align-items: center;
-        }
-        .modal-content {
-            background: white;
-            padding: 20px;
-            border-radius: 5px;
-            width: 400px;
-        }
+        body { font-family: sans-serif; font-size: 12px; padding: 20px; background: #f0f0f0; }
+        table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+        th, td { font-size: 11px; border: 1px solid #ccc; padding: 3px; vertical-align: top; white-space: normal; }
+        .position-cell { display: block; margin-bottom: 2px; cursor: pointer; padding: 2px; font-size: 11px; border-bottom: 1px dotted #ccc; }
+        .used { background-color: #ccc; color: #666; cursor: not-allowed; }
+        .assigned-item { background: #d2f5a3; margin-bottom: 2px; padding: 2px 4px; cursor: pointer; border-radius: 4px; display: block; }
+        .drop-target { min-height: 20px; min-width: 80px; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.4); justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 20px; border-radius: 5px; width: 400px; }
         .modal h3 { margin-top: 0; }
         .modal button { margin-top: 10px; }
-        .summary {
-            font-size: 11px;
-            font-weight: bold;
-            padding-top: 4px;
-        }
+        .date-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; max-height: 300px; overflow-y: auto; }
+        .places { margin-top: 10px; }
+        .places-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 10px; }
+        .places-grid button { padding: 5px; font-size: 12px; cursor: pointer; }
+        .summary { font-size: 11px; font-weight: bold; padding-top: 4px; }
     </style>
 </head>
 <body>
@@ -142,24 +89,24 @@ foreach ($positions as $p) {
 <form method="post" action="NP/save_build_plan.php">
     <input type="hidden" name="order" value="<?= htmlspecialchars($order) ?>">
     <table id="bottom-table">
+        <thead>
         <tr>
+            <th>Место</th>
             <?php foreach ($dates as $d): ?>
                 <th><?= $d ?></th>
             <?php endforeach; ?>
         </tr>
-        <!-- Генерируем 17 строк для мест на сборочном столе -->
-        <?php for ($i = 0; $i < 17; $i++): ?>
+        </thead>
+        <tbody>
+        <?php for ($place = 1; $place <= 17; $place++): ?>
             <tr>
+                <td><?= $place ?></td>
                 <?php foreach ($dates as $d): ?>
-                    <td class="drop-target" data-date="<?= $d ?>" data-row="<?= $i ?>"></td>
+                    <td class="drop-target" data-date="<?= $d ?>" data-place="<?= $place ?>"></td>
                 <?php endforeach; ?>
             </tr>
         <?php endfor; ?>
-        <tr class="summary-row">
-            <?php foreach ($dates as $d): ?>
-                <td class="summary" id="summary-<?= $d ?>">0 позиций, 0 фильтров</td>
-            <?php endforeach; ?>
-        </tr>
+        </tbody>
     </table>
     <input type="hidden" name="plan_data" id="plan_data">
     <button type="submit" onclick="preparePlan()">Сохранить план</button>
@@ -168,7 +115,11 @@ foreach ($positions as $p) {
 <div class="modal" id="modal">
     <div class="modal-content">
         <h3>Выберите дату</h3>
-        <div id="modal-dates"></div>
+        <div id="modal-dates" class="date-grid"></div>
+        <div class="places">
+            <h4>Выберите место:</h4>
+            <div id="modal-places" class="places-grid"></div>
+        </div>
         <button onclick="closeModal()">Отмена</button>
     </div>
 </div>
@@ -177,26 +128,15 @@ foreach ($positions as $p) {
     let selectedLabel = '';
     let selectedCutDate = '';
     let selectedId = '';
+    let selectedDate = '';
 
     function closeModal() {
         document.getElementById("modal").style.display = "none";
         selectedLabel = '';
         selectedCutDate = '';
         selectedId = '';
-    }
-
-    function updateSummary(date) {
-        let totalPositions = 0;
-        let totalFilters = 0;
-        document.querySelectorAll(`.drop-target[data-date="${date}"]`).forEach(td => {
-            const div = td.querySelector('div');
-            if (div) {
-                totalPositions++;
-                totalFilters += parseFloat(div.getAttribute('data-filters') || "0");
-            }
-        });
-        document.getElementById("summary-" + date).innerText =
-            `${totalPositions} позиций, ${totalFilters} фильтров`;
+        selectedDate = '';
+        document.getElementById("modal-places").innerHTML = ""; // Очистка кнопок мест
     }
 
     function attachRemoveHandlers() {
@@ -204,14 +144,8 @@ foreach ($positions as $p) {
             div.onclick = () => {
                 const posId = div.getAttribute('data-id');
                 const upperCell = document.querySelector('.position-cell.used[data-id="' + posId + '"]');
-                if (upperCell) {
-                    upperCell.classList.remove('used');
-                }
-                document.querySelectorAll('.assigned-item[data-id="' + posId + '"]').forEach(item => {
-                    const parentDate = item.closest('.drop-target').dataset.date;
-                    item.remove();
-                    updateSummary(parentDate);
-                });
+                if (upperCell) upperCell.classList.remove('used');
+                document.querySelectorAll(`.assigned-item[data-id='${posId}']`).forEach(item => item.remove());
             };
         });
     }
@@ -225,17 +159,13 @@ foreach ($positions as $p) {
 
             const modalDates = document.getElementById("modal-dates");
             modalDates.innerHTML = "";
-
-            document.querySelectorAll('.drop-target').forEach(td => {
-                const date = td.dataset.date;
-                if (date >= selectedCutDate) {
+            document.querySelectorAll('#bottom-table thead th').forEach((th, i) => {
+                if (i > 0 && th.innerText >= selectedCutDate) {
                     const btn = document.createElement("button");
-                    btn.innerText = date;
-                    btn.style.display = "block";
+                    btn.innerText = th.innerText;
                     btn.onclick = () => {
-                        distributeToBuildPlan(date);
-                        closeModal();
-                        cell.classList.add('used');
+                        selectedDate = th.innerText;
+                        renderPlaces();
                     };
                     modalDates.appendChild(btn);
                 }
@@ -245,96 +175,60 @@ foreach ($positions as $p) {
         });
     });
 
-    function distributeToBuildPlan(startDate) {
+    function renderPlaces() {
+        const modalPlaces = document.getElementById("modal-places");
+        modalPlaces.innerHTML = "";
+        for (let i = 1; i <= 17; i++) {
+            const btn = document.createElement("button");
+            btn.innerText = "Место " + i;
+            btn.onclick = () => {
+                distributeToBuildPlan(selectedDate, i);
+                const cell = document.querySelector('.position-cell[data-id="' + selectedId + '"]');
+                if (cell) cell.classList.add('used');
+                closeModal(); // Закрыть окно после выбора
+            };
+            modalPlaces.appendChild(btn);
+        }
+    }
+
+    function distributeToBuildPlan(startDate, place) {
         const match = selectedLabel.match(/\[(\d+)]\s+(\d+(\.\d+)?)/);
         if (!match) return;
         let total = parseFloat(match[2]);
         const fillsPerDay = parseInt(document.getElementById("fills_per_day").value || "50");
 
-        const dayColumns = Array.from(document.querySelectorAll(`.drop-target[data-date]`))
-            .reduce((acc, td) => {
-                const date = td.dataset.date;
-                if (!acc[date]) acc[date] = [];
-                acc[date].push(td);
-                return acc;
-            }, {});
+        const dates = Array.from(document.querySelectorAll('#bottom-table thead th'))
+            .slice(1)
+            .map(th => th.innerText)
+            .filter(date => date >= startDate);
 
-        const availableDates = Object.keys(dayColumns).filter(date => date >= startDate);
-        for (let d of availableDates) {
-            let cells = dayColumns[d];
-            for (let cell of cells) {
-                if (!cell.innerHTML && total > 0) {
-                    const batch = Math.min(total, fillsPerDay);
-                    const div = document.createElement('div');
-                    const filterName = selectedLabel.split('[')[0].trim();
-                    div.innerText = `${filterName} (${batch})`;
-                    div.setAttribute('data-filters', batch);
-                    div.setAttribute('data-id', selectedId);
-                    div.classList.add('assigned-item');
-
-                    cell.appendChild(div);
-                    updateSummary(d);
-                    attachRemoveHandlers();
-                    total -= batch;
-                    if (total <= 0) return;
-                }
+        let dateIndex = 0;
+        while (total > 0 && dateIndex < dates.length) {
+            const batch = Math.min(total, fillsPerDay);
+            const td = document.querySelector(`.drop-target[data-date='${dates[dateIndex]}'][data-place='${place}']`);
+            if (td) {
+                const div = document.createElement('div');
+                const filterName = selectedLabel.split('[')[0].trim();
+                div.innerText = `${filterName} (${batch})`;
+                div.classList.add('assigned-item');
+                div.setAttribute('data-id', selectedId);
+                td.appendChild(div);
             }
+            total -= batch;
+            dateIndex++;
         }
-    }
-
-    function addDay() {
-        const topTable = document.getElementById('top-table');
-        const bottomTable = document.getElementById('bottom-table');
-
-        const lastDateCell = topTable.querySelector('tr th:last-child');
-        const lastDate = new Date(lastDateCell.innerText);
-        lastDate.setDate(lastDate.getDate() + 1);
-        const newDateStr = lastDate.toISOString().slice(0, 10);
-
-        // Верхняя таблица
-        const topHead = topTable.querySelector('tr');
-        const newTopTh = document.createElement('th');
-        newTopTh.innerText = newDateStr;
-        topHead.appendChild(newTopTh);
-
-        const topRow = topTable.querySelector('tr:nth-of-type(2)');
-        const newTopTd = document.createElement('td');
-        topRow.appendChild(newTopTd);
-
-        // Нижняя таблица
-        const bottomHead = bottomTable.querySelector('tr:first-child');
-        const newBottomTh = document.createElement('th');
-        newBottomTh.innerText = newDateStr;
-        bottomHead.appendChild(newBottomTh);
-
-        const allRows = bottomTable.querySelectorAll('tr');
-        for (let i = 1; i <= 17; i++) {
-            const newTd = document.createElement('td');
-            newTd.classList.add('drop-target');
-            newTd.setAttribute('data-date', newDateStr);
-            newTd.setAttribute('data-row', i - 1);
-            allRows[i].appendChild(newTd);
-        }
-
-        const summaryRow = bottomTable.querySelector('.summary-row');
-        const newSummaryTd = document.createElement('td');
-        newSummaryTd.classList.add('summary');
-        newSummaryTd.id = "summary-" + newDateStr;
-        newSummaryTd.innerText = "0 позиций, 0 фильтров";
-        summaryRow.appendChild(newSummaryTd);
+        attachRemoveHandlers();
     }
 
     function preparePlan() {
         const data = {};
         document.querySelectorAll('.drop-target').forEach(td => {
             const date = td.getAttribute('data-date');
-            const div = td.querySelector('div');
-            if (div) {
-                if (!data[date]) data[date] = [];
-                data[date].push({
-                    label: div.innerText,
-                    count: parseFloat(div.getAttribute('data-filters') || "0")
-                });
+            const place = td.getAttribute('data-place');
+            const items = Array.from(td.querySelectorAll('div')).map(d => d.innerText);
+            if (items.length > 0) {
+                if (!data[date]) data[date] = {};
+                data[date][place] = items;
             }
         });
         document.getElementById('plan_data').value = JSON.stringify(data);
