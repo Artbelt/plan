@@ -69,6 +69,19 @@ require_once('tools/tools.php');
             font-weight: normal;
             margin-right: 10px;
         }
+        #change-log {
+            margin-top: 20px;
+            padding: 10px;
+            background: #f9f9f9;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 14px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        #change-log div {
+            margin-bottom: 4px;
+        }
     </style>
 </head>
 <body>
@@ -84,10 +97,10 @@ if (isset($_POST['filter_name'])){
 
 if (isset($_POST['analog_filter']) AND ($_POST['analog_filter'] != '')){
     $analog_filter = $_POST['analog_filter'];
-    echo "<p style='text-align: center'>ANALOG_FILTER = " . $analog_filter."";
+    echo "<p style='text-align: center'>ANALOG_FILTER = " . $analog_filter . "</p>";
     $analog_data = get_filter_data($analog_filter);
 } else {
-    echo "<p>Аналог не определен";
+    echo "<p style='text-align: center';>Аналог не определен</p>";
     $analog_data = array(
         'paper_package_length' => '',
         'paper_package_width' => '',
@@ -127,14 +140,14 @@ if (isset($_POST['analog_filter']) AND ($_POST['analog_filter'] != '')){
     <hr>
     <div class="section-title">Гофропакет:</div>
     <div class="field-group">
-        <label>Длина:<input type="text" size="5" name="p_p_length" value="<?php echo $analog_data['paper_package_length'] ?>"></label>
-        <label>Ширина:<input type="text" size="5" name="p_p_width" value="<?php echo $analog_data['paper_package_width'] ?>"></label>
-        <label>Высота:<input type="text" size="5" name="p_p_height" value="<?php echo $analog_data['paper_package_height'] ?>"></label>
-        <label>Кол-во ребер:<input type="text" size="5" name="p_p_pleats_count" value="<?php echo $analog_data['paper_package_pleats_count'] ?>"></label>
+        <label>Длина г/п:<input type="text" size="5" name="p_p_length" value="<?php echo $analog_data['paper_package_length'] ?>"></label>
+        <label>Ширина г/п:<input type="text" size="5" name="p_p_width" value="<?php echo $analog_data['paper_package_width'] ?>"></label>
+        <label>Высота г/п:<input type="text" size="5" name="p_p_height" value="<?php echo $analog_data['paper_package_height'] ?>"></label>
+        <label>Кол-во ребер  г/п:<input type="text" size="5" name="p_p_pleats_count" value="<?php echo $analog_data['paper_package_pleats_count'] ?>"></label>
     </div>
     <div class="field-group">
         <label>Усилитель:<input type="text" size="2" name="p_p_amplifier" value="<?php echo $analog_data['paper_package_amplifier'] ?>"></label>
-        <label>Поставщик:
+        <label>Поставщик  г/п:
             <select name="p_p_supplier">
                 <option></option>
                 <option <?php if ($analog_data['paper_package_supplier'] == 'У2'){echo 'selected';} ?> >У2</option>
@@ -142,22 +155,22 @@ if (isset($_POST['analog_filter']) AND ($_POST['analog_filter'] != '')){
         </label>
     </div>
     <div class="field-group">
-        <label>Комментарий:<input type="text" size="50" name="p_p_remark" value="<?php echo $analog_data['paper_package_remark'] ?>"></label>
+        <label>Комментарий  г/п:<input type="text" size="50" name="p_p_remark" value="<?php echo $analog_data['paper_package_remark'] ?>"></label>
     </div>
 
     <hr>
     <div class="section-title">Каркас:</div>
     <div class="field-group">
-        <label>Длина:<input type="text" size="5" name="wf_length" value="<?php echo $analog_data['wireframe_length'] ?>"></label>
-        <label>Ширина:<input type="text" size="5" name="wf_width" value="<?php echo $analog_data['wireframe_width'] ?>"></label>
-        <label>Материал:
+        <label>Длина каркаса:<input type="text" size="5" name="wf_length" value="<?php echo $analog_data['wireframe_length'] ?>"></label>
+        <label>Ширина каркаса:<input type="text" size="5" name="wf_width" value="<?php echo $analog_data['wireframe_width'] ?>"></label>
+        <label>Материал каркаса:
             <select name="wf_material">
                 <option></option>
                 <option <?php if ($analog_data['wireframe_material'] == 'ОЦ 0,45'){echo 'selected';} ?>>ОЦ 0,45</option>
                 <option <?php if ($analog_data['wireframe_material'] == 'Жесть 0,22'){echo 'selected';} ?>>Жесть 0,22</option>
             </select>
         </label>
-        <label>Поставщик:
+        <label>Поставщик каркаса:
             <select name="wf_supplier">
                 <option></option>
                 <option <?php if ($analog_data['wireframe_supplier'] == 'ЗУ'){echo 'selected';} ?>>ЗУ</option>
@@ -168,15 +181,15 @@ if (isset($_POST['analog_filter']) AND ($_POST['analog_filter'] != '')){
     <hr>
     <div class="section-title">Предфильтр:</div>
     <div class="field-group">
-        <label>Длина:<input type="text" size="5" name="pf_length" value="<?php echo $analog_data['prefilter_length'] ?>"></label>
-        <label>Ширина:<input type="text" size="5" name="pf_width" value="<?php echo $analog_data['prefilter_width'] ?>"></label>
-        <label>Материал:
+        <label>Длина предфильтра:<input type="text" size="5" name="pf_length" value="<?php echo $analog_data['prefilter_length'] ?>"></label>
+        <label>Ширина предфильтра:<input type="text" size="5" name="pf_width" value="<?php echo $analog_data['prefilter_width'] ?>"></label>
+        <label>Материал предфильтра:
             <select name="pf_material">
                 <option></option>
                 <option <?php if ($analog_data['prefilter_material'] == 'Н/т полотно'){echo 'selected';} ?>>Н/т полотно</option>
             </select>
         </label>
-        <label>Поставщик:
+        <label>Поставщик предфильтра:
             <select name="pf_supplier">
                 <option></option>
                 <option <?php if ($analog_data['prefilter_supplier'] == 'УУ'){echo 'selected';} ?>>УУ</option>
@@ -184,7 +197,7 @@ if (isset($_POST['analog_filter']) AND ($_POST['analog_filter'] != '')){
         </label>
     </div>
     <div class="field-group">
-        <label>Комментарий:<input type="text" size="50" name="pf_remark" value="<?php echo $analog_data['prefilter_remark'] ?>"></label>
+        <label>Комментарий к предфильтру:<input type="text" size="50" name="pf_remark" value="<?php echo $analog_data['prefilter_remark'] ?>"></label>
     </div>
 
     <hr>
@@ -204,8 +217,37 @@ if (isset($_POST['analog_filter']) AND ($_POST['analog_filter'] != '')){
         <label>Примечание:<input type="text" size="100" name="remark" value="<?php echo $analog_data['comment'] ?>"></label>
     </div>
 
+    <hr>
+    <div id="change-log"><b>Изменения:</b></div>
+    <input type="hidden" name="changes_log" id="changes_log">
+
     <input type="submit" value="Сохранить фильтр">
 </form>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const logDiv = document.getElementById("change-log");
+        const logField = document.getElementById("changes_log");
+
+        document.querySelectorAll("input[type=text], select").forEach(el => {
+            el.dataset.oldValue = el.value;
+
+            el.addEventListener("change", function() {
+                let oldVal = this.dataset.oldValue || "пусто";
+                let newVal = this.value || "пусто";
+                if (oldVal !== newVal) {
+                    let label = this.closest("label") ? this.closest("label").innerText.split(':')[0] : this.name;
+                    let msg = `- изменено ${label} с ${oldVal} на ${newVal}`;
+                    let p = document.createElement("div");
+                    p.textContent = msg;
+                    logDiv.appendChild(p);
+                    this.dataset.oldValue = newVal;
+                    logField.value += msg + "\n";
+                }
+            });
+        });
+    });
+</script>
 
 </body>
 </html>
