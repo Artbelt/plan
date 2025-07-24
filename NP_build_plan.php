@@ -11,13 +11,18 @@ for ($i = 0; $i < $days; $i++) {
     $start_date->modify('+1 day');
 }
 
-// Получение позиций из гофроплана
-$stmt = $pdo->prepare("SELECT plan_date, filter_label FROM corrugation_plan WHERE order_number = ?");
+// Получение позиций из гофроплана (включаем count)
+$stmt = $pdo->prepare("SELECT plan_date, filter_label, count FROM corrugation_plan WHERE order_number = ?");
 $stmt->execute([$order]);
 $positions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $by_date = [];
 foreach ($positions as $p) {
-    $by_date[$p['plan_date']][] = $p['filter_label'];
+    $tooltip = "{$p['filter_label']} | Кол-во гофропакетов: {$p['count']}";
+    $by_date[$p['plan_date']][] = [
+        'label' => $p['filter_label'],
+        'tooltip' => $tooltip,
+        'count' => $p['count']
+    ];
 }
 ?>
 <!DOCTYPE html>
@@ -84,16 +89,16 @@ foreach ($positions as $p) {
     <tr>
         <?php foreach ($dates as $d): ?>
             <td>
-                <?php foreach ($by_date[$d] ?? [] as $label): ?>
+                <?php foreach ($by_date[$d] ?? [] as $item): ?>
                     <?php
-                    $tooltip = $label;
-                    $short = preg_replace('/\[\d+]\s+\d+(\.\d+)?$/', '', $label);
+                    $short = preg_replace('/\[\d+]\s+\d+(\.\d+)?$/', '', $item['label']);
                     $uniqueId = uniqid('pos_');
                     ?>
                     <div class="position-cell"
                          data-id="<?= $uniqueId ?>"
-                         data-label="<?= htmlspecialchars($label) ?>"
-                         title="<?= htmlspecialchars($tooltip) ?>"
+                         data-label="<?= htmlspecialchars($item['label']) ?>"
+                         data-count="<?= $item['count'] ?>"
+                         title="<?= htmlspecialchars($item['tooltip']) ?>"
                          data-cut-date="<?= $d ?>">
                         <?= htmlspecialchars($short) ?>
                     </div>
@@ -200,7 +205,7 @@ foreach ($positions as $p) {
     });
 
     function highlightByLabel(label) {
-        const match = label.match(/\d{4}/); // Ищем 4 цифры
+        const match = label.match(/\d{4}/);
         if (!match) return;
         const digits = match[0];
 
@@ -211,7 +216,6 @@ foreach ($positions as $p) {
             }
         });
     }
-
 
     function removeHoverHighlight() {
         document.querySelectorAll('.hover-highlight').forEach(el => el.classList.remove('hover-highlight'));
@@ -227,7 +231,7 @@ foreach ($positions as $p) {
 
             const td = document.querySelector(`.drop-target[data-date='${date}'][data-place='${i}']`);
             const items = td.querySelectorAll('.assigned-item');
-            const isFull = items.length >= 2;  // 2 половинки максимум
+            const isFull = items.length >= 2;
 
             if (isFull) {
                 btn.disabled = true;
@@ -257,9 +261,22 @@ foreach ($positions as $p) {
 
         let dateIndex = 0;
         while (total > 0 && dateIndex < dates.length) {
-            const batch = Math.min(total, fillsPerDay);
             const td = document.querySelector(`.drop-target[data-date='${dates[dateIndex]}'][data-place='${place}']`);
+
             if (td) {
+                let alreadyInCell = 0;
+                td.querySelectorAll('.assigned-item').forEach(item => {
+                    const countMatch = item.title.match(/\((\d+)\)/);
+                    if (countMatch) alreadyInCell += parseInt(countMatch[1]);
+                });
+
+                let freeSpace = fillsPerDay - alreadyInCell;
+                if (freeSpace <= 0) {
+                    dateIndex++;
+                    continue;
+                }
+
+                const batch = Math.min(total, freeSpace);
                 const div = document.createElement('div');
                 const filterName = selectedLabel.split('[')[0].trim();
                 div.innerText = filterName;
@@ -274,12 +291,14 @@ foreach ($positions as $p) {
 
                 div.setAttribute('data-id', selectedId);
                 td.appendChild(div);
+
+                total -= batch;
             }
-            total -= batch;
             dateIndex++;
         }
         attachRemoveHandlers();
     }
+
 
     function preparePlan() {
         const data = {};
