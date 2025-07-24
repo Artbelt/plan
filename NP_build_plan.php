@@ -46,11 +46,7 @@ foreach ($positions as $p) {
             box-sizing: border-box;
             width: 100%;
         }
-        .half-width {
-            width: 50%;
-            float: left;
-            box-sizing: border-box;
-        }
+        .half-width { width: 50%; float: left; box-sizing: border-box; }
         .drop-target { min-height: 20px; min-width: 80px; position: relative; }
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.4); justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 20px; border-radius: 5px; width: 400px; }
@@ -61,10 +57,9 @@ foreach ($positions as $p) {
         .places-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 10px; }
         .places-grid button { padding: 5px; font-size: 12px; cursor: pointer; }
         .summary { font-size: 11px; font-weight: bold; padding-top: 4px; }
-        .hover-highlight {
-            background-color: #ffe780 !important;
-            transition: background-color 0.2s;
-        }
+        .hover-highlight { background-color: #ffe780 !important; transition: background-color 0.2s; }
+        .highlight-col { background-color: #ffe6b3 !important; }
+        .highlight-row { background-color: #fff3cd !important; }
     </style>
 </head>
 <body>
@@ -75,6 +70,7 @@ foreach ($positions as $p) {
     <input type="hidden" name="order" value="<?= htmlspecialchars($order) ?>">
     <button type="submit">Построить таблицу</button>
     <button type="button" onclick="addDay()">Добавить день</button>
+    <button type="button" onclick="removeDay()">Убрать день</button>
 </form>
 
 <label>Заливок в смену: <input type="number" id="fills_per_day" value="50" min="1" style="width:60px;"></label>
@@ -152,7 +148,6 @@ foreach ($positions as $p) {
     let selectedCutDate = '';
     let selectedId = '';
     let selectedDate = '';
-    let selectedCount = 0;
 
     function closeModal() {
         document.getElementById("modal").style.display = "none";
@@ -160,7 +155,6 @@ foreach ($positions as $p) {
         selectedCutDate = '';
         selectedId = '';
         selectedDate = '';
-        selectedCount = 0;
         document.getElementById("modal-places").innerHTML = "";
     }
 
@@ -168,7 +162,6 @@ foreach ($positions as $p) {
         document.querySelectorAll('.assigned-item').forEach(div => {
             div.onmouseenter = () => highlightByLabel(div.dataset.label);
             div.onmouseleave = removeHoverHighlight;
-
             div.onclick = () => {
                 const posId = div.getAttribute('data-id');
                 const upperCell = document.querySelector('.position-cell.used[data-id="' + posId + '"]');
@@ -181,14 +174,11 @@ foreach ($positions as $p) {
     document.querySelectorAll('.position-cell').forEach(cell => {
         cell.onmouseenter = () => highlightByLabel(cell.dataset.label);
         cell.onmouseleave = removeHoverHighlight;
-
         cell.addEventListener('click', () => {
             if (cell.classList.contains('used')) return;
             selectedLabel = cell.dataset.label;
             selectedCutDate = cell.dataset.cutDate;
             selectedId = cell.dataset.id;
-            selectedCount = parseInt(cell.dataset.count);
-
             const modalDates = document.getElementById("modal-dates");
             modalDates.innerHTML = "";
             document.querySelectorAll('#bottom-table thead th').forEach((th, i) => {
@@ -202,7 +192,6 @@ foreach ($positions as $p) {
                     modalDates.appendChild(btn);
                 }
             });
-
             document.getElementById("modal").style.display = "flex";
         });
     });
@@ -211,12 +200,9 @@ foreach ($positions as $p) {
         const match = label.match(/\d{4}/);
         if (!match) return;
         const digits = match[0];
-
         document.querySelectorAll('.position-cell, .assigned-item').forEach(el => {
             const elMatch = el.dataset.label.match(/\d{4}/);
-            if (elMatch && elMatch[0] === digits) {
-                el.classList.add('hover-highlight');
-            }
+            if (elMatch && elMatch[0] === digits) el.classList.add('hover-highlight');
         });
     }
 
@@ -227,15 +213,12 @@ foreach ($positions as $p) {
     function renderPlacesForDate(date) {
         const modalPlaces = document.getElementById("modal-places");
         modalPlaces.innerHTML = "";
-
         for (let i = 1; i <= 17; i++) {
             const btn = document.createElement("button");
             btn.innerText = "Место " + i;
-
             const td = document.querySelector(`.drop-target[data-date='${date}'][data-place='${i}']`);
             const items = td.querySelectorAll('.assigned-item');
             const isFull = items.length >= 2;
-
             if (isFull) {
                 btn.disabled = true;
                 btn.style.opacity = "0.5";
@@ -252,31 +235,21 @@ foreach ($positions as $p) {
     }
 
     function distributeToBuildPlan(startDate, place) {
-        let total = selectedCount;
+        let total = parseInt(document.querySelector(`.position-cell[data-id="${selectedId}"]`).dataset.count);
         const fillsPerDay = parseInt(document.getElementById("fills_per_day").value || "50");
-
         const dates = Array.from(document.querySelectorAll('#bottom-table thead th'))
-            .slice(1)
-            .map(th => th.innerText)
-            .filter(date => date >= startDate);
-
+            .slice(1).map(th => th.innerText).filter(date => date >= startDate);
         let dateIndex = 0;
         while (total > 0 && dateIndex < dates.length) {
             const td = document.querySelector(`.drop-target[data-date='${dates[dateIndex]}'][data-place='${place}']`);
-
             if (td) {
                 let alreadyInCell = 0;
                 td.querySelectorAll('.assigned-item').forEach(item => {
                     const countMatch = item.title.match(/\((\d+)\)/);
                     if (countMatch) alreadyInCell += parseInt(countMatch[1]);
                 });
-
                 let freeSpace = fillsPerDay - alreadyInCell;
-                if (freeSpace <= 0) {
-                    dateIndex++;
-                    continue;
-                }
-
+                if (freeSpace <= 0) { dateIndex++; continue; }
                 const batch = Math.min(total, freeSpace);
                 const div = document.createElement('div');
                 const filterName = selectedLabel.split('[')[0].trim();
@@ -284,15 +257,12 @@ foreach ($positions as $p) {
                 div.title = `${filterName} (${batch})`;
                 div.classList.add('assigned-item');
                 div.setAttribute('data-label', selectedLabel);
-
                 if (td.querySelector('.assigned-item')) {
                     div.classList.add('half-width');
                     td.querySelector('.assigned-item').classList.add('half-width');
                 }
-
                 div.setAttribute('data-id', selectedId);
                 td.appendChild(div);
-
                 total -= batch;
             }
             dateIndex++;
@@ -324,21 +294,17 @@ foreach ($positions as $p) {
         const lastDate = new Date(lastDateCell.innerText);
         lastDate.setDate(lastDate.getDate() + 1);
         const newDateStr = lastDate.toISOString().split('T')[0];
-
         const topHeaderRow = topTable.querySelector('tr:first-child');
         const newTopTh = document.createElement('th');
         newTopTh.innerText = newDateStr;
         topHeaderRow.appendChild(newTopTh);
-
         const topSecondRow = topTable.querySelector('tr:nth-child(2)');
         const newTopTd = document.createElement('td');
         topSecondRow.appendChild(newTopTd);
-
         const bottomHeaderRow = bottomTable.querySelector('thead tr');
         const newBottomTh = document.createElement('th');
         newBottomTh.innerText = newDateStr;
         bottomHeaderRow.appendChild(newBottomTh);
-
         const bottomRows = bottomTable.querySelectorAll('tbody tr');
         bottomRows.forEach(row => {
             const place = row.querySelector('td:first-child').innerText;
@@ -350,7 +316,52 @@ foreach ($positions as $p) {
         });
     }
 
+    function removeDay() {
+        const topTable = document.getElementById('top-table');
+        const bottomTable = document.getElementById('bottom-table');
+        const topHeaders = topTable.querySelectorAll('tr:first-child th');
+        if (topHeaders.length <= 1) return;
+        topHeaders[topHeaders.length - 1].remove();
+        const topRows = topTable.querySelectorAll('tr:nth-child(2) td');
+        if (topRows.length > 0) topRows[topRows.length - 1].remove();
+        const bottomHeaders = bottomTable.querySelectorAll('thead th');
+        if (bottomHeaders.length <= 2) return;
+        bottomHeaders[bottomHeaders.length - 1].remove();
+        const bottomRows = bottomTable.querySelectorAll('tbody tr');
+        bottomRows.forEach(row => {
+            const cells = row.querySelectorAll('td');
+            if (cells.length > 1) cells[cells.length - 1].remove();
+        });
+    }
+
+    function addTableHoverEffect() {
+        const bottomTable = document.getElementById('bottom-table');
+        const rows = bottomTable.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+            const cells = row.querySelectorAll('td.drop-target');
+            cells.forEach((cell, cellIndex) => {
+                cell.addEventListener('mouseenter', () => {
+                    row.querySelectorAll('td').forEach(td => td.classList.add('highlight-row'));
+                    const allRows = bottomTable.querySelectorAll('tbody tr');
+                    allRows.forEach(r => {
+                        const c = r.querySelectorAll('td')[cellIndex + 1];
+                        if (c) c.classList.add('highlight-col');
+                    });
+                    const ths = bottomTable.querySelectorAll('thead th');
+                    if (ths[cellIndex + 1]) ths[cellIndex + 1].classList.add('highlight-col');
+                });
+                cell.addEventListener('mouseleave', () => {
+                    row.querySelectorAll('td').forEach(td => td.classList.remove('highlight-row'));
+                    const allCells = bottomTable.querySelectorAll('td, th');
+                    allCells.forEach(c => c.classList.remove('highlight-col'));
+                });
+            });
+        });
+    }
+
+    addTableHoverEffect();
     window.addDay = addDay;
+    window.removeDay = removeDay;
 </script>
 </body>
 </html>

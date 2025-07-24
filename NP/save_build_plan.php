@@ -12,15 +12,20 @@ $stmt = $pdo->prepare("DELETE FROM build_plan WHERE order_number = ?");
 $stmt->execute([$order]);
 
 // Вставим новые
-$insert = $pdo->prepare("INSERT INTO build_plan (order_number, assign_date, filter_label, count) VALUES (?, ?, ?, ?)");
+$insert = $pdo->prepare("
+    INSERT INTO build_plan (order_number, assign_date, place, filter_label, count)
+    VALUES (?, ?, ?, ?, ?)
+");
 
-foreach ($data as $date => $items) {
-    foreach ($items as $item) {
-        $label = $item['label'] ?? '';
-        $count = $item['count'] ?? 0;
+foreach ($data as $date => $places) {
+    foreach ($places as $place => $items) {
+        foreach ($items as $item) {
+            $label = $item['label'] ?? '';
+            $count = $item['count'] ?? 0;
 
-        if ($label && $count > 0) {
-            $insert->execute([$order, $date, $label, $count]);
+            if ($label && $count > 0) {
+                $insert->execute([$order, $date, $place, $label, $count]);
+            }
         }
     }
 }
