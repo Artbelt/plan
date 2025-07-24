@@ -238,7 +238,6 @@ foreach ($positions as $p) {
                 div.title = `${filterName} (${batch})`;
                 div.classList.add('assigned-item');
 
-                // Если уже есть элемент, делим на половины
                 if (td.querySelector('.assigned-item')) {
                     div.classList.add('half-width');
                     td.querySelector('.assigned-item').classList.add('half-width');
@@ -263,26 +262,22 @@ foreach ($positions as $p) {
                 count: d.title.match(/\((\d+)\)/) ? parseInt(d.title.match(/\((\d+)\)/)[1]) : 0
             }));
             if (items.length > 0) {
-                if (!data[date]) data[date] = {};
-                data[date][place] = items;
+                if (!data[date]) data[date] = [];
+                items.forEach(item => data[date].push(item));
             }
         });
         document.getElementById('plan_data').value = JSON.stringify(data);
     }
 
-</script>
-<script>
     function addDay() {
         const topTable = document.getElementById('top-table');
         const bottomTable = document.getElementById('bottom-table');
 
-        // Получаем последнюю дату из нижней таблицы
         const lastDateCell = bottomTable.querySelector('thead th:last-child');
         const lastDate = new Date(lastDateCell.innerText);
         lastDate.setDate(lastDate.getDate() + 1);
         const newDateStr = lastDate.toISOString().split('T')[0];
 
-        // === Добавляем колонку в верхнюю таблицу ===
         const topHeaderRow = topTable.querySelector('tr:first-child');
         const newTopTh = document.createElement('th');
         newTopTh.innerText = newDateStr;
@@ -292,13 +287,11 @@ foreach ($positions as $p) {
         const newTopTd = document.createElement('td');
         topSecondRow.appendChild(newTopTd);
 
-        // === Добавляем колонку в нижнюю таблицу ===
         const bottomHeaderRow = bottomTable.querySelector('thead tr');
         const newBottomTh = document.createElement('th');
         newBottomTh.innerText = newDateStr;
         bottomHeaderRow.appendChild(newBottomTh);
 
-        // Добавляем ячейку для каждого места (1–17)
         const bottomRows = bottomTable.querySelectorAll('tbody tr');
         bottomRows.forEach(row => {
             const place = row.querySelector('td:first-child').innerText;
@@ -309,8 +302,6 @@ foreach ($positions as $p) {
             row.appendChild(newTd);
         });
     }
-
-    // Делаем функцию глобальной
     window.addDay = addDay;
 </script>
 
