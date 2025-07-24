@@ -56,6 +56,10 @@ foreach ($positions as $p) {
         .places-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 10px; }
         .places-grid button { padding: 5px; font-size: 12px; cursor: pointer; }
         .summary { font-size: 11px; font-weight: bold; padding-top: 4px; }
+        .hover-highlight {
+            background-color: #ffe780 !important;
+            transition: background-color 0.2s;
+        }
     </style>
 </head>
 <body>
@@ -88,8 +92,8 @@ foreach ($positions as $p) {
                     ?>
                     <div class="position-cell"
                          data-id="<?= $uniqueId ?>"
-                         title="<?= htmlspecialchars($tooltip) ?>"
                          data-label="<?= htmlspecialchars($label) ?>"
+                         title="<?= htmlspecialchars($tooltip) ?>"
                          data-cut-date="<?= $d ?>">
                         <?= htmlspecialchars($short) ?>
                     </div>
@@ -155,6 +159,9 @@ foreach ($positions as $p) {
 
     function attachRemoveHandlers() {
         document.querySelectorAll('.assigned-item').forEach(div => {
+            div.onmouseenter = () => highlightByLabel(div.dataset.label);
+            div.onmouseleave = removeHoverHighlight;
+
             div.onclick = () => {
                 const posId = div.getAttribute('data-id');
                 const upperCell = document.querySelector('.position-cell.used[data-id="' + posId + '"]');
@@ -165,6 +172,9 @@ foreach ($positions as $p) {
     }
 
     document.querySelectorAll('.position-cell').forEach(cell => {
+        cell.onmouseenter = () => highlightByLabel(cell.dataset.label);
+        cell.onmouseleave = removeHoverHighlight;
+
         cell.addEventListener('click', () => {
             if (cell.classList.contains('used')) return;
             selectedLabel = cell.dataset.label;
@@ -188,6 +198,24 @@ foreach ($positions as $p) {
             document.getElementById("modal").style.display = "flex";
         });
     });
+
+    function highlightByLabel(label) {
+        const match = label.match(/\d{4}/); // Ищем 4 цифры
+        if (!match) return;
+        const digits = match[0];
+
+        document.querySelectorAll('.position-cell, .assigned-item').forEach(el => {
+            const elMatch = el.dataset.label.match(/\d{4}/);
+            if (elMatch && elMatch[0] === digits) {
+                el.classList.add('hover-highlight');
+            }
+        });
+    }
+
+
+    function removeHoverHighlight() {
+        document.querySelectorAll('.hover-highlight').forEach(el => el.classList.remove('hover-highlight'));
+    }
 
     function renderPlacesForDate(date) {
         const modalPlaces = document.getElementById("modal-places");
@@ -237,6 +265,7 @@ foreach ($positions as $p) {
                 div.innerText = filterName;
                 div.title = `${filterName} (${batch})`;
                 div.classList.add('assigned-item');
+                div.setAttribute('data-label', selectedLabel);
 
                 if (td.querySelector('.assigned-item')) {
                     div.classList.add('half-width');
@@ -258,12 +287,12 @@ foreach ($positions as $p) {
             const date = td.getAttribute('data-date');
             const place = td.getAttribute('data-place');
             const items = Array.from(td.querySelectorAll('div')).map(d => ({
-                label: d.innerText,
+                label: d.dataset.label,
                 count: d.title.match(/\((\d+)\)/) ? parseInt(d.title.match(/\((\d+)\)/)[1]) : 0
             }));
             if (items.length > 0) {
-                if (!data[date]) data[date] = [];
-                items.forEach(item => data[date].push(item));
+                if (!data[date]) data[date] = {};
+                data[date][place] = items;
             }
         });
         document.getElementById('plan_data').value = JSON.stringify(data);
@@ -272,7 +301,6 @@ foreach ($positions as $p) {
     function addDay() {
         const topTable = document.getElementById('top-table');
         const bottomTable = document.getElementById('bottom-table');
-
         const lastDateCell = bottomTable.querySelector('thead th:last-child');
         const lastDate = new Date(lastDateCell.innerText);
         lastDate.setDate(lastDate.getDate() + 1);
@@ -302,8 +330,8 @@ foreach ($positions as $p) {
             row.appendChild(newTd);
         });
     }
+
     window.addDay = addDay;
 </script>
-
 </body>
 </html>
