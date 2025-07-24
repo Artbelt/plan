@@ -31,8 +31,22 @@ foreach ($positions as $p) {
         th, td { font-size: 11px; border: 1px solid #ccc; padding: 3px; vertical-align: top; white-space: normal; }
         .position-cell { display: block; margin-bottom: 2px; cursor: pointer; padding: 2px; font-size: 11px; border-bottom: 1px dotted #ccc; }
         .used { background-color: #ccc; color: #666; cursor: not-allowed; }
-        .assigned-item { background: #d2f5a3; margin-bottom: 2px; padding: 2px 4px; cursor: pointer; border-radius: 4px; display: block; }
-        .drop-target { min-height: 20px; min-width: 80px; }
+        .assigned-item {
+            background: #d2f5a3;
+            margin-bottom: 2px;
+            padding: 2px 4px;
+            cursor: pointer;
+            border-radius: 4px;
+            display: block;
+            box-sizing: border-box;
+            width: 100%;
+        }
+        .half-width {
+            width: 50%;
+            float: left;
+            box-sizing: border-box;
+        }
+        .drop-target { min-height: 20px; min-width: 80px; position: relative; }
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.4); justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 20px; border-radius: 5px; width: 400px; }
         .modal h3 { margin-top: 0; }
@@ -184,9 +198,10 @@ foreach ($positions as $p) {
             btn.innerText = "Место " + i;
 
             const td = document.querySelector(`.drop-target[data-date='${date}'][data-place='${i}']`);
-            const isOccupied = td && td.querySelector('.assigned-item');
+            const items = td.querySelectorAll('.assigned-item');
+            const isFull = items.length >= 2;  // 2 половинки максимум
 
-            if (isOccupied) {
+            if (isFull) {
                 btn.disabled = true;
                 btn.style.opacity = "0.5";
             } else {
@@ -219,8 +234,16 @@ foreach ($positions as $p) {
             if (td) {
                 const div = document.createElement('div');
                 const filterName = selectedLabel.split('[')[0].trim();
-                div.innerText = `${filterName} (${batch})`;
+                div.innerText = filterName;
+                div.title = `${filterName} (${batch})`;
                 div.classList.add('assigned-item');
+
+                // Если уже есть элемент, делим на половины
+                if (td.querySelector('.assigned-item')) {
+                    div.classList.add('half-width');
+                    td.querySelector('.assigned-item').classList.add('half-width');
+                }
+
                 div.setAttribute('data-id', selectedId);
                 td.appendChild(div);
             }
@@ -235,7 +258,10 @@ foreach ($positions as $p) {
         document.querySelectorAll('.drop-target').forEach(td => {
             const date = td.getAttribute('data-date');
             const place = td.getAttribute('data-place');
-            const items = Array.from(td.querySelectorAll('div')).map(d => d.innerText);
+            const items = Array.from(td.querySelectorAll('div')).map(d => ({
+                label: d.innerText,
+                count: d.title.match(/\((\d+)\)/) ? parseInt(d.title.match(/\((\d+)\)/)[1]) : 0
+            }));
             if (items.length > 0) {
                 if (!data[date]) data[date] = {};
                 data[date][place] = items;
@@ -243,6 +269,50 @@ foreach ($positions as $p) {
         });
         document.getElementById('plan_data').value = JSON.stringify(data);
     }
+
 </script>
+<script>
+    function addDay() {
+        const topTable = document.getElementById('top-table');
+        const bottomTable = document.getElementById('bottom-table');
+
+        // Получаем последнюю дату из нижней таблицы
+        const lastDateCell = bottomTable.querySelector('thead th:last-child');
+        const lastDate = new Date(lastDateCell.innerText);
+        lastDate.setDate(lastDate.getDate() + 1);
+        const newDateStr = lastDate.toISOString().split('T')[0];
+
+        // === Добавляем колонку в верхнюю таблицу ===
+        const topHeaderRow = topTable.querySelector('tr:first-child');
+        const newTopTh = document.createElement('th');
+        newTopTh.innerText = newDateStr;
+        topHeaderRow.appendChild(newTopTh);
+
+        const topSecondRow = topTable.querySelector('tr:nth-child(2)');
+        const newTopTd = document.createElement('td');
+        topSecondRow.appendChild(newTopTd);
+
+        // === Добавляем колонку в нижнюю таблицу ===
+        const bottomHeaderRow = bottomTable.querySelector('thead tr');
+        const newBottomTh = document.createElement('th');
+        newBottomTh.innerText = newDateStr;
+        bottomHeaderRow.appendChild(newBottomTh);
+
+        // Добавляем ячейку для каждого места (1–17)
+        const bottomRows = bottomTable.querySelectorAll('tbody tr');
+        bottomRows.forEach(row => {
+            const place = row.querySelector('td:first-child').innerText;
+            const newTd = document.createElement('td');
+            newTd.classList.add('drop-target');
+            newTd.setAttribute('data-date', newDateStr);
+            newTd.setAttribute('data-place', place);
+            row.appendChild(newTd);
+        });
+    }
+
+    // Делаем функцию глобальной
+    window.addDay = addDay;
+</script>
+
 </body>
 </html>
