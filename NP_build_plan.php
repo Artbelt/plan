@@ -152,6 +152,7 @@ foreach ($positions as $p) {
     let selectedCutDate = '';
     let selectedId = '';
     let selectedDate = '';
+    let selectedCount = 0;
 
     function closeModal() {
         document.getElementById("modal").style.display = "none";
@@ -159,6 +160,7 @@ foreach ($positions as $p) {
         selectedCutDate = '';
         selectedId = '';
         selectedDate = '';
+        selectedCount = 0;
         document.getElementById("modal-places").innerHTML = "";
     }
 
@@ -185,6 +187,7 @@ foreach ($positions as $p) {
             selectedLabel = cell.dataset.label;
             selectedCutDate = cell.dataset.cutDate;
             selectedId = cell.dataset.id;
+            selectedCount = parseInt(cell.dataset.count);
 
             const modalDates = document.getElementById("modal-dates");
             modalDates.innerHTML = "";
@@ -249,9 +252,7 @@ foreach ($positions as $p) {
     }
 
     function distributeToBuildPlan(startDate, place) {
-        const match = selectedLabel.match(/\[(\d+)]\s+(\d+(\.\d+)?)/);
-        if (!match) return;
-        let total = parseFloat(match[2]);
+        let total = selectedCount;
         const fillsPerDay = parseInt(document.getElementById("fills_per_day").value || "50");
 
         const dates = Array.from(document.querySelectorAll('#bottom-table thead th'))
@@ -298,7 +299,6 @@ foreach ($positions as $p) {
         }
         attachRemoveHandlers();
     }
-
 
     function preparePlan() {
         const data = {};
