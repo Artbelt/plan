@@ -198,13 +198,6 @@ if ($selected_order) {
         <?php if ($pack_fact): ?>
             <table>
                 <tr><th>Деталь</th><th>Кол-во</th><th>Дата</th></tr>
-                <?php foreach ($pack_fact as $row): ?>
-                    <tr>
-                        <td><?= htmlspecialchars($row['name_of_parts']) ?></td>
-                        <td><?= htmlspecialchars($row['count_of_parts']) ?></td>
-                        <td><?= htmlspecialchars($row['date_of_production']) ?></td>
-                    </tr>
-                <?php endforeach; ?>
             </table>
         <?php else: ?>
             <p>Нет данных</p>
