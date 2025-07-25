@@ -144,7 +144,14 @@ $period = new DatePeriod($start, new DateInterval('P1D'), $end);
             <?php if ($items): ?>
                 <ul>
                     <?php foreach ($items as $item): ?>
-                        <li><?= htmlspecialchars($item['filter_label']) ?> — <?= (int)$item['count'] ?></li>
+
+                        <?php
+                        $label = preg_replace('/\[.*$/', '', $item['filter_label']); // убираем часть после [
+                        $label = preg_replace('/[●◩⏃]/u', '', $label); // убираем значки
+                        $label = trim($label);
+                        ?>
+                        <li><?= htmlspecialchars($label) ?> — <?= (int)$item['count'] ?></li>
+
                     <?php endforeach; ?>
                 </ul>
             <?php else: ?>

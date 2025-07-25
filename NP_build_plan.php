@@ -294,17 +294,23 @@ foreach ($positions as $p) {
         const lastDate = new Date(lastDateCell.innerText);
         lastDate.setDate(lastDate.getDate() + 1);
         const newDateStr = lastDate.toISOString().split('T')[0];
+
+        // Верхняя таблица
         const topHeaderRow = topTable.querySelector('tr:first-child');
         const newTopTh = document.createElement('th');
         newTopTh.innerText = newDateStr;
         topHeaderRow.appendChild(newTopTh);
+
         const topSecondRow = topTable.querySelector('tr:nth-child(2)');
         const newTopTd = document.createElement('td');
         topSecondRow.appendChild(newTopTd);
+
+        // Нижняя таблица
         const bottomHeaderRow = bottomTable.querySelector('thead tr');
         const newBottomTh = document.createElement('th');
         newBottomTh.innerText = newDateStr;
         bottomHeaderRow.appendChild(newBottomTh);
+
         const bottomRows = bottomTable.querySelectorAll('tbody tr');
         bottomRows.forEach(row => {
             const place = row.querySelector('td:first-child').innerText;
@@ -314,7 +320,11 @@ foreach ($positions as $p) {
             newTd.setAttribute('data-place', place);
             row.appendChild(newTd);
         });
+
+        // Перепривязываем обработчики для новых ячеек
+        addTableHoverEffect();
     }
+
 
     function removeDay() {
         const topTable = document.getElementById('top-table');
