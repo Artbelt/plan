@@ -1,110 +1,79 @@
-<?php require_once('tools/tools.php')?>
-
-
-<html>
+<?php require_once('tools/tools.php'); ?>
+<!DOCTYPE html>
+<html lang="ru">
 <head>
+    <meta charset="UTF-8">
+    <title>Plan system — факт гофропакетов</title>
+    <style>
+        body{font-family:sans-serif;margin:16px}
+        .wrap{max-width:720px;margin:0 auto}
+        .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+        input[type="date"],button{padding:8px 10px;font-size:14px}
+        button{cursor:pointer}
+        #show_filters_place{margin-top:14px}
 
-    <title>
-        Plan system
-    </title>
-    <!--<link rel="stylesheet" href="sheets.css">-->
-    <style type="text/css">
-        div {
-            width: 400px; /* Ширина элемента в пикселах */
-            padding: 10px; /* Поля вокруг текста */
-            margin: auto; /* Выравниваем по центру */
-        <!-- background: #4b91ad;--> /* Цвет фона */
+        /* Таблица и тултипы (как у тебя) */
+        table{border:1px solid #000;border-collapse:collapse;font-size:14px;margin-top:10px;width:100%}
+        th,td{border:1px solid #000;padding:5px 8px;text-align:center}
+
+        .tooltip{position:relative;display:inline-block;cursor:help}
+        .tooltip .tooltiptext{
+            visibility:hidden;max-width:400px;background:#333;color:#fff;text-align:left;
+            padding:6px 10px;border-radius:6px;position:absolute;z-index:10;bottom:125%;
+            left:50%;transform:translateX(-50%);opacity:0;transition:opacity .25s;white-space:pre-line
         }
-        select{
-            width: 180px;
-        }
-        info {
-            background: green;
-        }
+        .tooltip:hover .tooltiptext{visibility:visible;opacity:1}
     </style>
+</head>
 <body>
-<!-- скрипт календаря -->
-<script src="tools/calendar.js" type="text/javascript"></script>
+<div class="wrap">
+    <h2>Изготовленные гофропакеты</h2>
+
+    <div class="row">
+        <label>Дата:</label>
+        <input type="date" id="date_one" />
+        <button type="button" onclick="show_one()">Показать за день</button>
+    </div>
+
+    <div class="row">
+        <label>Период:</label>
+        <input type="date" id="date_start" />
+        <span>—</span>
+        <input type="date" id="date_end" />
+        <button type="button" onclick="show_range()">Показать за период</button>
+    </div>
+
+    <div id="show_filters_place"></div>
+
+    <div style="margin-top:14px">
+        <button id="back_button" onclick="history.back()" style="width:150px">Назад</button>
+    </div>
+</div>
+
 <script>
-
-    function show_manufactured_parts() {//отправка данных для списания выпуска продукции
-
-        //проверка заполненности полей для проведения выпуска продукции
-
-        //проверка календаря
-        let calendar_box = document.getElementById('calendar');
-        if (calendar_box.value == "dd-mm-yy"){
-            alert("Не выбрана дата");
-            return;
-        }
-
-        //выбор даты производства
-        let production_date = document.getElementById("calendar").value;
-
-        //AJAX запрос
-        let xhttp = new XMLHttpRequest();
-        xhttp.onreadystatechange = function() {
-            if (this.readyState == 4 && this.status == 200) {
-                document.getElementById("show_filters_place").innerHTML = this.responseText;
-            }
-        };
-
-        xhttp.open("POST", "show_manufactured_parts.php", true);
-        xhttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
-        xhttp.send("production_date="+production_date);
-
-        //очистка списка с выпущенной продукцией
-        //calendar_box.value = "dd-mm-yy";
-
+    function show_one(){
+        const d = document.getElementById('date_one').value;
+        if(!d){ alert('Выберите дату'); return; }
+        post('show_corr_fact.php', 'date='+encodeURIComponent(d));
     }
-
-    function show_manufactured_parts_more() {//отправка данных для списания выпуска продукции
-
-        //проверка заполненности полей для проведения выпуска продукции
-
-        //проверка календаря
-        let calendar_box_start = document.getElementById('calendar_start');
-        if (calendar_box_start.value == "dd-mm-yy"){
-            alert("Не выбрана дата");
-            return;
-        }
-        let calendar_box_end = document.getElementById('calendar_end');
-        if (calendar_box_end.value == "dd-mm-yy"){
-            alert("Не выбрана дата");
-            return;
-        }
-        //выбор даты производства
-        let production_date_start = document.getElementById("calendar_start").value;
-        let production_date_end = document.getElementById("calendar_end").value;
-
-        //AJAX запрос
-        let xhttp = new XMLHttpRequest();
-        xhttp.onreadystatechange = function() {
-            if (this.readyState == 4 && this.status == 200) {
-                document.getElementById("show_filters_place").innerHTML = this.responseText;
+    function show_range(){
+        const s = document.getElementById('date_start').value;
+        const e = document.getElementById('date_end').value;
+        if(!s || !e){ alert('Выберите диапазон дат'); return; }
+        post('show_corr_fact_range.php', 'start='+encodeURIComponent(s)+'&end='+encodeURIComponent(e));
+    }
+    function post(url, body){
+        const x = new XMLHttpRequest();
+        x.onreadystatechange=function(){
+            if(this.readyState===4){
+                if(this.status===200){ document.getElementById('show_filters_place').innerHTML=this.responseText; }
+                else { alert('Ошибка загрузки: '+this.status); }
             }
         };
-
-        xhttp.open("POST", "show_manufactured_parts_more.php", true);
-        xhttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
-        xhttp.send("production_date_start="+production_date_start+'&production_date_end='+production_date_end);
-
-        //очистка списка с выпущенной продукцией
-        //calendar_box.value = "dd-mm-yy";
-
+        x.open('POST', url, true);
+        x.setRequestHeader('Content-Type','application/x-www-form-urlencoded');
+        x.send(body);
     }
 </script>
-
-Выбор даты: <input type="text" id="calendar" value="dd-mm-yy" onfocus="this.select();lcs(this)" onclick="event.cancelBubble=true;this.select();lcs(this)"><p>
-
-                <input type="button" onclick="show_manufactured_parts()" value="Просмотр выпущенной за выбранную дату"/>
-
-
-<p>Выбор даты: <input type="text" id="calendar_start" value="dd-mm-yy" onfocus="this.select();lcs(this)" onclick="event.cancelBubble=true;this.select();lcs(this)">
-               <input type="text" id="calendar_end" value="dd-mm-yy" onfocus="this.select();lcs(this)" onclick="event.cancelBubble=true;this.select();lcs(this)"><p>
-               <input type="button" onclick="show_manufactured_parts_more()" value="Просмотр выпущенной в заданном диапазоне дат"/>
-<p id="show_filters_place"></p>
-
-<button id="back_button" onclick= window.history.back() style="width: 150px">Назад</button>
-
 </body>
+</html>

@@ -118,7 +118,7 @@ $advertisement = 'Информация';
             <input type="submit" value="Обзор выпуска продукции">
         </form>
         <form action="parts_output_view.php" method="post">
-            <input type="submit" value="Обзор комплектующих">
+            <input type="submit" value="Обзор изготовленных гофропакетов">
         </form>
     </div>
 
@@ -159,9 +159,12 @@ $advertisement = 'Информация';
         <form action="archived_orders.php" target="_blank">
             <input type="submit" class="btn-order" value="Архив заявок">
         </form>
-        <form action="planning_manager.php" method="post">
-            <input type="submit" class="btn-order" value="Менеджер планирования">
+
+        <form action="NP_cut_index.php" method="post" target="_blank">
+            <input type="submit" class="btn-order" value="Менеджер планирования [НОВАЯ ВЕРСИЯ]">
         </form>
+        <form action="NP_supply_requirements.php" method="post" target="_blank">
+            <input type="submit" class="btn-order" value="Потребность в комплектации">
         <form enctype="multipart/form-data" action="load_file.php" method="POST">
             <input type="file" name="userfile">
             <input type="submit" class="btn-order" value="Загрузить заявку">
