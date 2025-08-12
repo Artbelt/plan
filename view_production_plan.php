@@ -161,7 +161,7 @@ $period = new DatePeriod($start, new DateInterval('P1D'), $end);
     <?php endforeach; ?>
 </div>
 
-<a class="btn-back" href="plans.php">← Назад к списку планов</a>
+<a class="btn-back" href="production_plans.php">← Назад к списку планов</a>
 
 <script>
     const searchInput = document.getElementById('searchInput');

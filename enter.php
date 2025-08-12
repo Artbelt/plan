@@ -113,9 +113,7 @@ $advertisement = 'Информация';
         <a href="test.php" target="_blank">
             <button>Выпуск продукции</button>
         </a>
-        <form action="parts_output_for_workers.php" method="post">
-            <input type="submit" value="Внесение гофропакетов">
-        </form>
+
         <form action="product_output_view.php" method="post">
             <input type="submit" value="Обзор выпуска продукции">
         </form>
@@ -145,7 +143,8 @@ $advertisement = 'Информация';
     <div class="section">
         <h2>Заявки</h2>
         <?php
-        $mysqli = new mysqli($mysql_host, $mysql_user, $mysql_user_pass, $mysql_database);
+        global $mysql_host, $mysql_user, $mysql_user_pass, $mysql_database, $workshop;
+        $mysqli = new mysqli( $mysql_host, $mysql_user, $mysql_user_pass, $mysql_database);
         $sql = "SELECT DISTINCT order_number, workshop, hide FROM orders;";
         if ($result = $mysqli->query($sql)) {
             echo '<form action="show_order.php" method="post" target="_blank">';

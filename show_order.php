@@ -92,71 +92,135 @@ require('tools/tools.php');
 require('settings.php');
 require('style/table.txt');
 
-// Получаем номер заявки
-$order_number = $_POST['order_number'] ?? '';
-
-// Функция для рендеринга ячейки с тултипом
+/**
+ * Рендер ячейки с тултипом по датам.
+ * $dateList — массив вида [дата1, кол-во1, дата2, кол-во2, ...]
+ * $totalQty — итоговое число, которое показываем в самой ячейке
+ */
 function renderTooltipCell($dateList, $totalQty) {
     if (empty($dateList)) {
         return "<td>$totalQty</td>";
     }
-
     $tooltip = '';
     for ($i = 0; $i < count($dateList); $i += 2) {
         $tooltip .= $dateList[$i] . ' — ' . $dateList[$i + 1] . " шт\n";
     }
-
     return "<td><div class='tooltip'>$totalQty<span class='tooltiptext'>".htmlspecialchars(trim($tooltip))."</span></div></td>";
 }
 
-// Загружаем заявку
+/**
+ * Грузим FАCT гофропакетов из corrugation_plan:
+ * - по заявке и фильтру
+ * - суммируем fact_count
+ * - для тултипа возвращаем разбивку по plan_date (по каждой строке плана, где fact_count>0)
+ *
+ * Возвращает [ $dateList, $totalFact ] как в renderTooltipCell
+ */
+function normalize_filter_label($label) {
+    $pos = mb_strpos($label, ' [');
+    if ($pos !== false) {
+        return trim(mb_substr($label, 0, $pos));
+    }
+    return trim($label);
+}
+
+function get_corr_fact_for_filter(PDO $pdo, string $orderNumber, string $filterLabel): array {
+    $filterLabel = normalize_filter_label($filterLabel);
+
+    $stmt = $pdo->prepare("
+        SELECT plan_date, COALESCE(fact_count,0) AS fact_count
+        FROM corrugation_plan
+        WHERE order_number = ?
+          AND TRIM(SUBSTRING_INDEX(filter_label, ' [', 1)) = ?
+          AND COALESCE(fact_count,0) > 0
+        ORDER BY plan_date
+    ");
+    $stmt->execute([$orderNumber, $filterLabel]);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $dateList = [];
+    $total = 0;
+    foreach ($rows as $r) {
+        $dateList[] = $r['plan_date'];
+        $dateList[] = (int)$r['fact_count'];
+        $total += (int)$r['fact_count'];
+    }
+    return [$dateList, $total];
+}
+
+// Получаем номер заявки
+$order_number = $_POST['order_number'] ?? '';
+
+// Подключим отдельный PDO для выборок из corrugation_plan (факт гофропакетов)
+$pdo_corr = new PDO("mysql:host=127.0.0.1;dbname=plan;charset=utf8mb4", "root", "");
+$pdo_corr->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+// Загружаем заявку (как и раньше)
 $result = show_order($order_number);
 
 // Инициализация счётчиков
-$filter_count_in_order = 0;
-$filter_count_produced = 0;
-$count = 0;
-$produced_parts_summ = 0;
+$filter_count_in_order = 0;   // всего фильтров по заявке (план)
+$filter_count_produced = 0;   // Всего изготовлено готовых фильтров (факт) — из select_produced_filters_by_order
+$count = 0;                   // номер п/п
+$corr_fact_summ = 0;          // суммарно изготовлено гофропакетов по всей заявке (из corrugation_plan)
 
 // Отрисовка таблицы
-echo "<h3>Заявка: $order_number</h3>";
+echo "<h3>Заявка: ".htmlspecialchars($order_number)."</h3>";
 echo "<table id='order_table'>";
 echo "<tr>
-        <th>№п/п</th><th>Фильтр</th><th>Количество, шт</th><th>Маркировка</th><th>Упаковка инд.</th>
-        <th>Этикетка инд.</th><th>Упаковка групп.</th><th>Норма упаковки</th><th>Этикетка групп.</th>
-        <th>Примечание</th><th>Изготовлено, шт</th><th>Остаток, шт</th><th>Изготовленные гофропакеты, шт</th>
+        <th>№п/п</th>
+        <th>Фильтр</th>
+        <th>Количество, шт</th>
+        <th>Маркировка</th>
+        <th>Упаковка инд.</th>
+        <th>Этикетка инд.</th>
+        <th>Упаковка групп.</th>
+        <th>Норма упаковки</th>
+        <th>Этикетка групп.</th>
+        <th>Примечание</th>
+        <th>Изготовлено, шт</th>
+        <th>Остаток, шт</th>
+        <th>Изготовленные гофропакеты, шт</th>
       </tr>";
 
 while ($row = $result->fetch_assoc()) {
     $count++;
 
+    // Готовые фильтры по заявке/фильтру (как было)
     $prod_info = select_produced_filters_by_order($row['filter'], $order_number);
-    $date_list = $prod_info[0];
-    $total_qty = $prod_info[1];
+    $date_list_filters = $prod_info[0]; // массив дат/кол-в
+    $total_qty_filters = $prod_info[1]; // итог изготовлено фильтров
 
     $filter_count_in_order += (int)$row['count'];
-    $filter_count_produced += $total_qty;
+    $filter_count_produced += $total_qty_filters;
 
-    $difference = (int)$row['count'] - $total_qty;
-    $manufactured_parts = manufactured_part_count($row['filter'], $order_number);
-    $manufactured_parts = (int)manufactured_part_count($row['filter'], $order_number);
-    $produced_parts_summ += $manufactured_parts;
+    $difference = (int)$row['count'] - $total_qty_filters;
+
+    // Гофропакеты: теперь из corrugation_plan.fact_count
+    list($corr_date_list, $corr_total) = get_corr_fact_for_filter($pdo_corr, $order_number, $row['filter']);
+    $corr_fact_summ += (int)$corr_total;
 
     echo "<tr>
         <td>$count</td>
-        <td>{$row['filter']}</td>
-        <td>{$row['count']}</td>
-        <td>{$row['marking']}</td>
-        <td>{$row['personal_packaging']}</td>
-        <td>{$row['personal_label']}</td>
-        <td>{$row['group_packaging']}</td>
-        <td>{$row['packaging_rate']}</td>
-        <td>{$row['group_label']}</td>
-        <td>{$row['remark']}</td>";
+        <td>".htmlspecialchars($row['filter'])."</td>
+        <td>".(int)$row['count']."</td>
+        <td>".htmlspecialchars($row['marking'])."</td>
+        <td>".htmlspecialchars($row['personal_packaging'])."</td>
+        <td>".htmlspecialchars($row['personal_label'])."</td>
+        <td>".htmlspecialchars($row['group_packaging'])."</td>
+        <td>".htmlspecialchars($row['packaging_rate'])."</td>
+        <td>".htmlspecialchars($row['group_label'])."</td>
+        <td>".htmlspecialchars($row['remark'])."</td>";
 
-    echo renderTooltipCell($date_list, $total_qty);
-    echo "<td>$difference</td>";
-    echo "<td>$manufactured_parts</td>";
+    // Колонка «Изготовлено, шт» — готовые фильтры с тултипом по датам (как было)
+    echo renderTooltipCell($date_list_filters, $total_qty_filters);
+
+    // Остаток по фильтрам
+    echo "<td>".(int)$difference."</td>";
+
+    // Новая логика «Изготовленные гофропакеты, шт» — из corrugation_plan.fact_count (+ тултип по plan_date)
+    echo renderTooltipCell($corr_date_list, (int)$corr_total);
+
     echo "</tr>";
 }
 
@@ -166,18 +230,17 @@ $summ_difference = $filter_count_in_order - $filter_count_produced;
 echo "<tr>
         <td>Итого:</td>
         <td></td>
-        <td>$filter_count_in_order</td>
+        <td>".(int)$filter_count_in_order."</td>
         <td colspan='7'></td>
-        <td>$filter_count_produced</td>
-        <td>{$summ_difference}*</td>
-        <td>{$produced_parts_summ}*</td>
+        <td>".(int)$filter_count_produced."</td>
+        <td>".(int)$summ_difference."*</td>
+        <td>".(int)$corr_fact_summ."*</td>
       </tr>";
 
 echo "</table>";
 echo "<p>* - без учета перевыполнения</p>";
-
-// Кнопки управления
 ?>
+
 <br>
 <form action='order_planning_U2.php' method='post'>
     <input type='hidden' name='order_number' value='<?= htmlspecialchars($order_number) ?>'>

@@ -64,4 +64,4 @@ echo "<form action='product_output_view.php' method='post'><input type='submit' 
     </a>
 <?php
 echo "<form action='show_bill.php' method='post'><input type='submit' value=' * Создание отчетки * '></form>";
-echo "<form action='parts_output_for_workers.php' method='post'><input type='submit' value='Внесение изготовленных гофропакетов'></form>";
+echo "<form action='[DEL]parts_output_for_workers.php' method='post'><input type='submit' value='Внесение изготовленных гофропакетов'></form>";
