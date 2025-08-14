@@ -137,6 +137,19 @@ $advertisement = 'Информация';
             <input type="hidden" name="workshop" value="<?= htmlspecialchars($workshop) ?>">
             <input type="submit" value="Журнал для гофропакетчиков">
         </form>
+        <hr>
+        <form action="NP_monitor.php" method="post" target="_blank">
+            <input type="hidden" name="workshop" value="<?= htmlspecialchars($workshop) ?>">
+            <input type="submit" value="Мониторинг">
+        </form>
+        <form action="worker_modules/tasks_corrugation.php" method="post" target="_blank">
+            <input type="hidden" name="workshop" value="<?= htmlspecialchars($workshop) ?>">
+            <input type="submit" value="Модуль оператора ГМ">
+        </form>
+        <form action="worker_modules/tasks_cut.php" method="post" target="_blank">
+            <input type="hidden" name="workshop" value="<?= htmlspecialchars($workshop) ?>">
+            <input type="submit" value="Модуль оператора бумагорезки">
+        </form>
     </div>
 
     <!-- Блок заявок -->
