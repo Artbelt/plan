@@ -137,6 +137,10 @@ $advertisement = 'Информация';
             <input type="hidden" name="workshop" value="<?= htmlspecialchars($workshop) ?>">
             <input type="submit" value="Журнал для гофропакетчиков">
         </form>
+        <form action="gofra_packages_table.php" method="post" target="_blank">
+            <input type="hidden" name="workshop" value="<?= htmlspecialchars($workshop) ?>">
+            <input type="submit" value="Количество гофропакетов из рулона">
+        </form>
         <hr>
         <form action="NP_monitor.php" method="post" target="_blank">
             <input type="hidden" name="workshop" value="<?= htmlspecialchars($workshop) ?>">
