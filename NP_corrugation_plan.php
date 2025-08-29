@@ -91,7 +91,7 @@ foreach ($positions as $p) {
 <h2>Планирование гофрирования для заявки <?= htmlspecialchars($order) ?></h2>
 <form method="get" style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
     Дата начала: <input type="date" name="start" value="<?= htmlspecialchars($_GET['start'] ?? date('Y-m-d')) ?>">
-    Дней: <input type="number" name="days" value="<?= $days ?>" min="1" max="30">
+    Дней: <input type="number" name="days" value="<?= $days ?>" min="1" max="90">
     <input type="hidden" name="order" value="<?= htmlspecialchars($order) ?>">
     <button type="submit">Построить таблицу</button>
     <button type="button" onclick="addDay()">Добавить день</button>
