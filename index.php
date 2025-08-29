@@ -19,14 +19,16 @@ $csrf = $_SESSION['csrf'];
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         :root {
-            --bg: #0f172a;            /* slate-900 */
-            --card: #111827;          /* gray-900 */
-            --text: #e5e7eb;          /* gray-200 */
-            --muted: #9ca3af;         /* gray-400 */
-            --primary: #3b82f6;       /* blue-500 */
-            --primary-hover: #2563eb; /* blue-600 */
-            --danger: #ef4444;        /* red-500 */
-            --border: #1f2937;        /* gray-800 */
+            --bg: #f3f4f6;            /* светлый фон */
+            --card: #ffffff;          /* карточка */
+            --text: #111827;          /* почти чёрный */
+            --muted: #6b7280;         /* серый текст */
+            --primary: #2563eb;       /* синий */
+            --primary-hover: #1d4ed8; /* синий темнее */
+            --danger-bg: #fee2e2;
+            --danger-border: #fecaca;
+            --danger-text: #b91c1c;
+            --border: #d1d5db;
         }
 
         * { box-sizing: border-box; }
@@ -34,9 +36,7 @@ $csrf = $_SESSION['csrf'];
 
         .auth-body {
             min-height: 100%;
-            background: radial-gradient(1200px 600px at 10% -10%, rgba(59,130,246,.15), transparent),
-            radial-gradient(1200px 600px at 110% 110%, rgba(16,185,129,.12), transparent),
-            var(--bg);
+            background: var(--bg);
             display: grid;
             place-items: center;
             padding: 24px;
@@ -45,23 +45,22 @@ $csrf = $_SESSION['csrf'];
         .auth-card {
             width: 100%;
             max-width: 420px;
-            background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
+            background: var(--card);
             border: 1px solid var(--border);
-            border-radius: 16px;
+            border-radius: 12px;
             padding: 28px;
-            box-shadow: 0 20px 60px rgba(0,0,0,.45);
-            backdrop-filter: blur(6px);
+            box-shadow: 0 10px 40px rgba(0,0,0,.08);
         }
 
         .auth-title { margin: 0 0 6px; font-size: 24px; font-weight: 700; }
         .auth-subtitle { margin: 0 0 18px; color: var(--muted); }
 
         .alert {
-            background: rgba(239,68,68,.1);
-            border: 1px solid rgba(239,68,68,.35);
-            color: #fecaca;
+            background: var(--danger-bg);
+            border: 1px solid var(--danger-border);
+            color: var(--danger-text);
             padding: 10px 12px;
-            border-radius: 10px;
+            border-radius: 8px;
             margin-bottom: 12px;
             font-size: 14px;
         }
@@ -73,15 +72,16 @@ $csrf = $_SESSION['csrf'];
         .field input, .field select, .field textarea {
             width: 100%;
             padding: 10px 12px;
-            border-radius: 10px;
+            border-radius: 8px;
             border: 1px solid var(--border);
-            background: #0b1220;
+            background: #fff;
             color: var(--text);
             outline: none;
+            transition: border .15s ease, box-shadow .15s ease;
         }
         .field input:focus, .field select:focus, .field textarea:focus {
             border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(59,130,246,.25);
+            box-shadow: 0 0 0 3px rgba(37,99,235,.25);
         }
 
         .btn-primary {
@@ -89,7 +89,7 @@ $csrf = $_SESSION['csrf'];
             width: 100%;
             padding: 12px 14px;
             border: none;
-            border-radius: 12px;
+            border-radius: 10px;
             background: var(--primary);
             color: white;
             font-weight: 600;
@@ -143,7 +143,7 @@ $csrf = $_SESSION['csrf'];
         <button type="submit" class="btn-primary">Войти</button>
     </form>
 
-    <div class="auth-footer">© <?php echo date('Y'); ?> Производство U2</div>
+    <div class="auth-footer">© <?php echo date('Y'); ?> AlphaFilter</div>
 </div>
 </body>
 </html>
