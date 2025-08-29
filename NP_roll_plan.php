@@ -17,175 +17,117 @@ foreach ($rows as $r) {
     <meta charset="UTF-8">
     <title>Планирование раскроя: <?= htmlspecialchars($order) ?></title>
     <style>
+        :root{
+            --dayW: 72px; /* ★ ширина колонок с датой: подправляй при необходимости */
+        }
         body {
             font-family: 'Segoe UI', sans-serif;
             padding: 20px;
             background: #f7f9fc;
             color: #333;
         }
-        th:first-child, td:first-child {
-            min-width: 80px;
-            max-width: 100px;
-            text-align: left;
-            white-space: normal;
-        }
-        .bale-label {
-            font-size: 12px;
-            margin-top: 4px;
-            color: #444;
-        }
+        .container { max-width: 1200px; margin: 0 auto; }
 
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
 
-        h2 {
-            color: #2c3e50;
-            font-size: 24px;
-            margin-bottom: 5px;
-        }
 
-        p {
-            margin-bottom: 20px;
-            font-size: 13px;
-            color: #666;
-        }
+        h2 { color: #2c3e50; font-size: 24px; margin-bottom: 5px; }
+        p { margin-bottom: 20px; font-size: 13px; color: #666; }
 
         form {
-            background: #ffffff;
-            padding: 15px;
-            border-radius: 8px;
+            background: #ffffff; padding: 15px; border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 10px;
+            display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
         }
-
-        label {
-            font-size: 14px;
-            color: #444;
+        label { font-size: 14px; color: #444; }
+        input[type="date"], input[type="number"]{
+            padding: 6px 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px;
         }
+        .btn { background-color: #1a73e8; color: #fff; border: none; border-radius: 5px; padding: 8px 16px; font-size: 14px; cursor: pointer; transition: background .3s; }
+        .btn:hover { background-color: #1557b0; }
 
-        input[type="date"],
-        input[type="number"] {
-            padding: 6px 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            font-size: 14px;
-        }
-
-        .btn {
-            background-color: #1a73e8;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            padding: 8px 16px;
-            font-size: 14px;
-            cursor: pointer;
-            transition: background 0.3s ease;
-        }
-
-        .btn:hover {
-            background-color: #1557b0;
-        }
-
-        #planArea {
+        #planArea{
+            position: relative;
             overflow-x: auto;
             margin-top: 30px;
         }
 
-        table {
-            border-collapse: collapse;
-            width: 100%;
+        table{
+            border-collapse: separate;
+            border-spacing: 0;
+            width: max-content;           /* ширина = сумме колонок */
             background: #fff;
             border-radius: 8px;
-            overflow: hidden;
+            /* ВАЖНО: убрать overflow:hidden — иначе sticky не работает */
+            /* overflow: hidden;  <-- удалить */
             box-shadow: 0 1px 4px rgba(0,0,0,0.05);
         }
 
-        th, td {
+        th, td{
             border: 1px solid #e0e0e0;
-            padding: 6px;
+            padding: 4px 6px;
             font-size: 11px;
             text-align: center;
             white-space: nowrap;
-        }
-
-        th {
-            background: #f0f3f8;
-            font-weight: 600;
-            min-width: 18px;
-            white-space: nowrap;
-        }
-
-        th:first-child {
-            background: #dce3f0;
-            writing-mode: horizontal-tb;
-            transform: none;
-            min-width: 120px;
-        }
-
-        td[colspan] {
-            background: #f9f9f9;
-            font-weight: bold;
-            font-size: 12px;
-        }
-
-        .highlight {
-            background-color: #d1ecf1 !important;
-        }
-
-        .overload {
-            background-color: #f8d7da !important;
-        }
-
-        .bale-label {
-            display: block;
-            font-size: 10px;
-            color: #666;
-            margin-top: 4px;
-            line-height: 1.2;
-            white-space: normal;
-        }
-
-        @media (max-width: 768px) {
-            form {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-
-            th:first-child {
-                min-width: 80px;
-            }
-
-            .btn {
-                width: 100%;
-            }
-        }
-        th, td {
-            border: 1px solid #e0e0e0;
-            padding: 0;
-            font-size: 11px;
-            text-align: center;
-            white-space: nowrap;
-            width: 12px;
-            min-width: 12px;
-            max-width: 12px;
-            height: 20px;
             box-sizing: border-box;
+            height: 20px;
+        }
+        th{ background:#f0f3f8; font-weight:600; }
+        /* фиксируем левый столбец */
+        #planArea { position: relative; }            /* чтобы sticky знал к чему привязываться */
+        #planArea table { border-collapse: separate; } /* sticky стабильнее с separate */
+
+        :root{ --dayW: 72px; }
+        th:not(:first-child), td:not(:first-child){
+            width: var(--dayW);
+            min-width: var(--dayW);
+            max-width: var(--dayW);
         }
 
-        .highlight {
-            background-color: #d1ecf1 !important;
-            border: 1px solid #0bb !important;
-            font-weight: normal;
-            box-shadow: none;
-            outline: none;
+        /* ЛИПКИЙ левый столбец */
+        th:first-child{
+            position: sticky;
+            left: 0;
+            z-index: 4;
+            min-width: 120px;
+            max-width: 320px;
+            text-align: left;
+            white-space: normal;
+            background: #dce3f0;              /* фон для заголовка колонки */
         }
+        td:first-child{
+            position: sticky;
+            left: 0;
+            z-index: 3;
+            min-width: 120px;
+            max-width: 320px;
+            text-align: left;
+            white-space: normal;
+            background: #fff;                  /* непрозрачный фон строк */
+            box-shadow: 2px 0 0 rgba(0,0,0,.06); /* тонкая вертикальная линия справа */
+        }
+        /* ★ фиксируем ширину только для колонок с датами */
+        th:not(:first-child), td:not(:first-child){
+            width: var(--dayW);
+            min-width: var(--dayW);
+            max-width: var(--dayW);
+        }
+
+        td[colspan] { background: #f9f9f9; font-weight: bold; font-size: 12px; }
+
+        .bale-label { display:block; font-size: 10px; color: #666; margin-top: 4px; line-height: 1.2; white-space: normal; }
+        .highlight { background-color: #d1ecf1 !important; border: 1px solid #0bb !important; }
+        .overload { background-color: #f8d7da !important; }
+
+        @media (max-width: 768px){
+            form { flex-direction: column; align-items: flex-start; }
+            th:first-child, td:first-child { min-width: 100px; }
+            .btn { width: 100%; }
+        }
+
+        /* нижняя полоса горизонтального скролла */
+        .hscroll { margin-top: 8px; height: 18px; border: 1px solid #e0e0e0; background: #fff; border-radius: 6px; overflow-x: auto; overflow-y: hidden; }
+        .hscroll-inner { height: 1px; }
     </style>
-
 </head>
 <body>
 <div class="container">
@@ -198,13 +140,18 @@ foreach ($rows as $r) {
         <button type="submit" class="btn">Построить таблицу</button>
     </form>
 
-
     <div id="planArea" style="margin-top: 20px;"></div>
+
+    <!-- Нижний бегунок -->
+    <div id="hScroll" class="hscroll" aria-label="Горизонтальная прокрутка">
+        <div class="hscroll-inner"></div>
+    </div>
 </div>
 
 <script>
     const bales = <?= json_encode($bales) ?>;
     let selected = {};
+
     function drawTable() {
         const start = new Date(document.getElementById('startDate').value);
         const days = parseInt(document.getElementById('daysCount').value);
@@ -220,7 +167,7 @@ foreach ($rows as $r) {
         for (let d = 0; d < days; d++) {
             const date = new Date(start);
             date.setDate(start.getDate() + d);
-            const dateStr = date.toISOString().split('T')[0]; // Полная дата: 2025-07-03
+            const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD
             headRow.innerHTML += `<th>${dateStr}</th>`;
         }
         thead.appendChild(headRow);
@@ -228,7 +175,7 @@ foreach ($rows as $r) {
 
         const tbody = document.createElement('tbody');
         Object.entries(bales).forEach(([baleId, rolls]) => {
-            const row = document.createElement('tr'); // ✅ создаём строку
+            const row = document.createElement('tr');
 
             const heights = rolls.map(r => `[${r.height}]`).join(' ');
             const tooltip = rolls.map(r => `${r.filter} [${r.height}] ${r.width}`).join('\n');
@@ -236,22 +183,19 @@ foreach ($rows as $r) {
             const cell = document.createElement('td');
             cell.innerHTML = `<strong>Бухта ${baleId}</strong><div class="bale-label">${heights}</div>`;
             cell.title = tooltip;
-
             row.appendChild(cell);
 
             for (let d = 0; d < days; d++) {
                 const date = new Date(start);
                 date.setDate(start.getDate() + d);
-                const dateStr = date.getDate().toString().padStart(2, '0'); // Только день
                 const td = document.createElement('td');
-                td.dataset.date = date.toISOString().split('T')[0]; // Сохраняем полную дату для логики
+                td.dataset.date = date.toISOString().split('T')[0];
                 td.dataset.baleId = baleId;
 
                 td.onclick = () => {
                     const sid = td.dataset.date;
                     const bid = td.dataset.baleId;
 
-                    // Удаляем выделение с других ячеек в той же строке
                     const rowCells = document.querySelectorAll(`td[data-bale-id="${bid}"]`);
                     rowCells.forEach(cell => {
                         cell.classList.remove('highlight');
@@ -262,7 +206,6 @@ foreach ($rows as $r) {
                         }
                     });
 
-                    // Выделяем текущую ячейку
                     if (!selected[sid]) selected[sid] = [];
                     if (!selected[sid].includes(bid)) {
                         selected[sid].push(bid);
@@ -293,20 +236,49 @@ foreach ($rows as $r) {
         table.appendChild(tbody);
         container.appendChild(table);
 
-        // Устанавливаем фиксированную ширину для всех столбцов
-        const headers = table.querySelectorAll('th');
-        headers.forEach((th, index) => {
-            th.style.width = '12px'; // Фиксированная ширина для всех столбцов, включая "Бухта"
-            th.style.minWidth = '12px';
-            th.style.maxWidth = '12px';
-        });
+        // ★ УБРАНО: блок, который принудительно ставил 12px всем th
+        // Теперь ширина управляется CSS-переменной --dayW
 
+        // Кнопка «Сохранить»
         const saveBtn = document.createElement('button');
         saveBtn.className = 'btn';
+        saveBtn.style.marginTop = '10px';
         saveBtn.innerText = 'Сохранить план';
         saveBtn.onclick = savePlan;
         container.appendChild(saveBtn);
+
+        // Нижний бегунок
+        setupBottomScrollbar(container, table);
     }
+
+    function setupBottomScrollbar(container, table) {
+        const bar = document.getElementById('hScroll');
+        if (!bar) return;
+        const inner = bar.querySelector('.hscroll-inner');
+
+        const updateWidth = () => { inner.style.width = table.scrollWidth + 'px'; };
+        updateWidth();
+
+        if (window.ResizeObserver) {
+            const ro = new ResizeObserver(updateWidth);
+            ro.observe(table);
+        } else {
+            window.addEventListener('resize', updateWidth);
+        }
+
+        let lock = false;
+        bar.addEventListener('scroll', () => {
+            if (lock) return; lock = true;
+            container.scrollLeft = bar.scrollLeft;
+            lock = false;
+        });
+        container.addEventListener('scroll', () => {
+            if (lock) return; lock = true;
+            bar.scrollLeft = container.scrollLeft;
+            lock = false;
+        });
+    }
+
     function updateTotals() {
         const all = document.querySelectorAll('td.highlight');
         const counter = {};
@@ -332,10 +304,7 @@ foreach ($rows as $r) {
     }
 
     function savePlan() {
-        const payload = {
-            order: <?= json_encode($order) ?>,
-            plan: selected
-        };
+        const payload = { order: <?= json_encode($order) ?>, plan: selected };
 
         fetch('NP/save_roll_plan.php', {
             method: 'POST',

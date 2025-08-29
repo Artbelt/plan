@@ -182,6 +182,7 @@ $advertisement = 'Информация';
         </form>
         <form action="NP_supply_requirements.php" method="post" target="_blank">
             <input type="submit" class="btn-order" value="Потребность в комплектации">
+        </form>
             <form enctype="multipart/form-data" action="load_file.php" method="POST">
                 <input type="file" name="userfile">
                 <input type="submit" class="btn-order" value="Загрузить заявку">
