@@ -15,20 +15,7 @@ try{
     if ($order===''){ http_response_code(400); echo "no order"; exit; }
     if (!is_array($plan)){ http_response_code(400); echo "bad plan"; exit; }
 
-    // Таблица, как вы дали
-    $pdo->exec("
-        CREATE TABLE IF NOT EXISTS roll_plan (
-          id INT(11) NOT NULL AUTO_INCREMENT,
-          order_number VARCHAR(50) DEFAULT NULL,
-          bale_id VARCHAR(50) DEFAULT NULL,
-          plan_date DATE DEFAULT NULL,
-          done TINYINT(1) DEFAULT 0 COMMENT 'Выполнено: 0 или 1',
-          PRIMARY KEY (id),
-          UNIQUE KEY order_number (order_number, bale_id)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    ");
-
-    // Собираем карту назначений: bale_id => plan_date
+    // Сформируем карту: bale_id => plan_date
     $newMap = [];
     foreach ($plan as $date => $bales){
         $dd = DateTime::createFromFormat('Y-m-d', (string)$date);
@@ -37,7 +24,7 @@ try{
         foreach ($bales as $bid){
             $b = trim((string)$bid);
             if ($b==='') continue;
-            // одна бухта — один день
+            // каждая бухта может быть только в один день
             $newMap[$b] = $dd->format('Y-m-d');
         }
     }
@@ -50,7 +37,7 @@ try{
     $existing = [];
     foreach ($st as $r) $existing[] = (string)$r['bale_id'];
 
-    // Бухты, которых нет в новом плане — обнулим дату (сохраняя done)
+    // Те, что были, но не присланы сейчас — обнулим дату (не удаляем, чтобы не потерять done)
     if ($existing){
         $toNull = array_diff($existing, array_keys($newMap));
         if ($toNull){
@@ -63,7 +50,7 @@ try{
         }
     }
 
-    // Upsert присланных: вставка/обновление plan_date; done не трогаем
+    // Upsert присланных: вставить/обновить plan_date, поле done не трогаем
     $ins = $pdo->prepare("
         INSERT INTO roll_plan(order_number, bale_id, plan_date)
         VALUES(?,?,?)

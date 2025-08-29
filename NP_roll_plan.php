@@ -1,5 +1,110 @@
 <?php
-$pdo = new PDO("mysql:host=127.0.0.1;dbname=plan;charset=utf8mb4", "root", "");
+/* cut_roll_plan.php — планирование раскроя (страница + API)
+   - Левый столбец фиксирован (sticky)
+   - Нижний горизонтальный бегунок синхронизирован с таблицей
+   - Ширина колонок дат регулируется CSS-переменной --dayW
+   - Встроены API: ?action=load_assignments и ?action=save_assignments
+*/
+
+$dsn  = "mysql:host=127.0.0.1;dbname=plan;charset=utf8mb4";
+$user = "root";
+$pass = "";
+
+$action = $_GET['action'] ?? '';
+
+/* ============================ API ===================================== */
+if (in_array($action, ['load_assignments','save_assignments'], true)) {
+    header('Content-Type: application/json; charset=utf-8');
+    try {
+        $pdo = new PDO($dsn, $user, $pass, [
+            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        ]);
+
+        // Таблица назначений: заявка → дата → бухта
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS roll_plan_assignments(
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                order_number VARCHAR(64) NOT NULL,
+                plan_date DATE NOT NULL,
+                bale_id VARCHAR(64) NOT NULL,
+                saved_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY(id),
+                UNIQUE KEY uniq (order_number, plan_date, bale_id),
+                KEY idx_order (order_number),
+                KEY idx_date (plan_date)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+
+        if ($action === 'load_assignments') {
+            $order = $_GET['order'] ?? '';
+            if ($order === '') { http_response_code(400); echo json_encode(['ok'=>false,'error'=>'no order']); exit; }
+
+            $st = $pdo->prepare("SELECT plan_date, bale_id
+                                 FROM roll_plan
+                                 WHERE order_number=?
+                                 ORDER BY plan_date, bale_id");
+            $st->execute([$order]);
+            $plan = [];
+            foreach ($st as $r) {
+                $d = $r['plan_date'];
+                $b = (string)$r['bale_id'];
+                $plan[$d][] = $b;
+            }
+            echo json_encode(['ok'=>true,'plan'=>$plan]); exit;
+        }
+
+        if ($action === 'save_assignments') {
+            $raw = file_get_contents('php://input');
+            $payload = $raw ? json_decode($raw, true) : [];
+            $order = (string)($payload['order'] ?? '');
+            $plan  = $payload['plan'] ?? [];
+
+            if ($order === '') { http_response_code(400); echo json_encode(['ok'=>false,'error'=>'no order']); exit; }
+            if (!is_array($plan)) { http_response_code(400); echo json_encode(['ok'=>false,'error'=>'bad plan']); exit; }
+
+            $pdo->beginTransaction();
+            $pdo->prepare("DELETE FROM roll_plan WHERE order_number=?")->execute([$order]);
+            $ins = $pdo->prepare("INSERT INTO roll_plan(order_number, plan_date, bale_id) VALUES(?,?,?)");
+
+            foreach ($plan as $date => $bales) {
+                $dd = DateTime::createFromFormat('Y-m-d', $date);
+                if (!$dd || !is_array($bales)) continue;
+                foreach ($bales as $bid) {
+                    $b = trim((string)$bid); if ($b==='') continue;
+                    $ins->execute([$order, $dd->format('Y-m-d'), $b]);
+                }
+            }
+            $pdo->commit();
+            $pdo->beginTransaction();
+            $pdo->prepare("UPDATE orders SET plan_ready = '1' WHERE order_number=?")->execute([$order]);
+            $pdo->commit();
+
+            echo json_encode(['ok'=>true]); exit;
+        }
+
+        echo json_encode(['ok'=>false,'error'=>'unknown action']); exit;
+
+    } catch(Throwable $e) {
+        if (!empty($pdo) && $pdo->inTransaction()) $pdo->rollBack();
+        http_response_code(500);
+        echo json_encode(['ok'=>false,'error'=>$e->getMessage()]);
+        exit;
+    }
+}
+
+/* ============================ PAGE ==================================== */
+
+try{
+    $pdo = new PDO($dsn,$user,$pass,[
+        PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC,
+    ]);
+}catch(Throwable $e){
+    http_response_code(500);
+    exit('DB error: '.$e->getMessage());
+}
+
 $order = $_GET['order'] ?? '';
 
 $stmt = $pdo->prepare("SELECT * FROM cut_plans WHERE order_number = ?");
@@ -8,7 +113,7 @@ $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $bales = [];
 foreach ($rows as $r) {
-    $bales[$r['bale_id']][] = $r;
+    $bales[$r['bale_id']][] = $r;   // одна строка = один «рулон» в бухте
 }
 ?>
 <!DOCTYPE html>
@@ -18,115 +123,114 @@ foreach ($rows as $r) {
     <title>Планирование раскроя: <?= htmlspecialchars($order) ?></title>
     <style>
         :root{
-            --dayW: 72px; /* ★ ширина колонок с датой: подправляй при необходимости */
+            /* ширина колонок с датой: под 60 дней комфортно 80–96px */
+            --dayW: 88px;
         }
+        *{ box-sizing: border-box; }
         body {
-            font-family: 'Segoe UI', sans-serif;
+            font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,Helvetica,sans-serif;
             padding: 20px;
             background: #f7f9fc;
             color: #333;
         }
         .container { max-width: 1200px; margin: 0 auto; }
 
-
-
-        h2 { color: #2c3e50; font-size: 24px; margin-bottom: 5px; }
-        p { margin-bottom: 20px; font-size: 13px; color: #666; }
+        h2 { color: #2c3e50; font-size: 22px; margin: 0 0 4px; }
+        p { margin: 0 0 16px; font-size: 13px; color: #666; }
 
         form {
-            background: #ffffff; padding: 15px; border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            background: #ffffff; padding: 12px; border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
             display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+            margin-top: 10px;
         }
         label { font-size: 14px; color: #444; }
         input[type="date"], input[type="number"]{
-            padding: 6px 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px;
+            padding: 6px 10px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px;
+            background:#fff; outline: none;
         }
-        .btn { background-color: #1a73e8; color: #fff; border: none; border-radius: 5px; padding: 8px 16px; font-size: 14px; cursor: pointer; transition: background .3s; }
-        .btn:hover { background-color: #1557b0; }
+        .btn {
+            background-color: #1a73e8; color: #fff; border: 1px solid #1a73e8;
+            border-radius: 10px; padding: 8px 14px; font-size: 14px; cursor: pointer;
+            transition: .15s ease; font-weight: 600;
+        }
+        .btn:hover { background-color: #1557b0; border-color:#1557b0; }
 
-        #planArea{
-            position: relative;
-            overflow-x: auto;
-            margin-top: 30px;
+        /* область с таблицей */
+        #planArea {
+            position: relative;     /* для sticky-первой колонки */
+            overflow-x: auto;       /* горизонтальная прокрутка */
+            overflow-y: auto;
+            margin-top: 14px;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            background:#fff;
+            box-shadow: 0 2px 8px rgba(0,0,0,.05);
+            max-height: 70vh;
+            padding: 0;             /* важно для sticky */
         }
 
-        table{
-            border-collapse: separate;
+        table {
+            border-collapse: separate;  /* sticky работает стабильнее */
             border-spacing: 0;
-            width: max-content;           /* ширина = сумме колонок */
+            width: max-content;         /* не сжимать: ширина = сумме колонок */
             background: #fff;
-            border-radius: 8px;
-            /* ВАЖНО: убрать overflow:hidden — иначе sticky не работает */
-            /* overflow: hidden;  <-- удалить */
-            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
         }
-
-        th, td{
-            border: 1px solid #e0e0e0;
-            padding: 4px 6px;
-            font-size: 11px;
+        th, td {
+            border: 1px solid #e5e7eb;
+            padding: 6px 8px;
+            font-size: 12px;
             text-align: center;
             white-space: nowrap;
-            box-sizing: border-box;
-            height: 20px;
+            height: 24px;
+            background:#fff;
         }
-        th{ background:#f0f3f8; font-weight:600; }
+        th { background: #f1f5f9; font-weight: 700; }
+
         /* фиксируем левый столбец */
-        #planArea { position: relative; }            /* чтобы sticky знал к чему привязываться */
-        #planArea table { border-collapse: separate; } /* sticky стабильнее с separate */
+        th:first-child {
+            position: sticky; left: 0; z-index: 5;
+            background: #e5ecf7;
+            text-align: left;
+            min-width: 160px; max-width: 360px; white-space: normal;
+        }
+        td:first-child {
+            position: sticky; left: 0; z-index: 4;
+            background: #fff;
+            text-align: left;
+            min-width: 160px; max-width: 360px; white-space: normal;
+            box-shadow: 2px 0 0 rgba(0,0,0,.06); /* аккуратная «граница» справа */
+        }
 
-        :root{ --dayW: 72px; }
+        /* ширина только для колонок с датой */
         th:not(:first-child), td:not(:first-child){
             width: var(--dayW);
             min-width: var(--dayW);
             max-width: var(--dayW);
         }
 
-        /* ЛИПКИЙ левый столбец */
-        th:first-child{
-            position: sticky;
-            left: 0;
-            z-index: 4;
-            min-width: 120px;
-            max-width: 320px;
-            text-align: left;
-            white-space: normal;
-            background: #dce3f0;              /* фон для заголовка колонки */
-        }
-        td:first-child{
-            position: sticky;
-            left: 0;
-            z-index: 3;
-            min-width: 120px;
-            max-width: 320px;
-            text-align: left;
-            white-space: normal;
-            background: #fff;                  /* непрозрачный фон строк */
-            box-shadow: 2px 0 0 rgba(0,0,0,.06); /* тонкая вертикальная линия справа */
-        }
-        /* ★ фиксируем ширину только для колонок с датами */
-        th:not(:first-child), td:not(:first-child){
-            width: var(--dayW);
-            min-width: var(--dayW);
-            max-width: var(--dayW);
-        }
+        .bale-label { display:block; font-size: 11px; color: #6b7280; margin-top: 3px; line-height: 1.2; white-space: normal; }
 
-        td[colspan] { background: #f9f9f9; font-weight: bold; font-size: 12px; }
+        .highlight { background-color: #d1ecf1 !important; border-color: #0bb !important; }
+        .overload  { background-color: #fde2e2 !important; }
 
-        .bale-label { display:block; font-size: 10px; color: #666; margin-top: 4px; line-height: 1.2; white-space: normal; }
-        .highlight { background-color: #d1ecf1 !important; border: 1px solid #0bb !important; }
-        .overload { background-color: #f8d7da !important; }
+        /* нижний «бегунок» */
+        .hscroll {
+            margin-top: 10px;
+            height: 18px;
+            border: 1px solid #e5e7eb;
+            background: #fff;
+            border-radius: 8px;
+            overflow-x: auto; overflow-y: hidden;
+            box-shadow: 0 1px 4px rgba(0,0,0,.04);
+        }
+        .hscroll-inner { height: 1px; }
 
         @media (max-width: 768px){
             form { flex-direction: column; align-items: flex-start; }
-            th:first-child, td:first-child { min-width: 100px; }
+            th:first-child, td:first-child { min-width: 140px; }
             .btn { width: 100%; }
         }
-
-        /* нижняя полоса горизонтального скролла */
-        .hscroll { margin-top: 8px; height: 18px; border: 1px solid #e0e0e0; background: #fff; border-radius: 6px; overflow-x: auto; overflow-y: hidden; }
-        .hscroll-inner { height: 1px; }
     </style>
 </head>
 <body>
@@ -137,10 +241,11 @@ foreach ($rows as $r) {
     <form onsubmit="event.preventDefault(); drawTable();">
         <label>Дата начала: <input type="date" id="startDate" required></label>
         <label>Дней: <input type="number" id="daysCount" min="1" value="10" required></label>
-        <button type="submit" class="btn">Построить таблицу</button>
+        <button type="submit" class="btn">Построить</button>
+        <button type="button" class="btn" id="btnLoad">Загрузить сохранённый</button>
     </form>
 
-    <div id="planArea" style="margin-top: 20px;"></div>
+    <div id="planArea"></div>
 
     <!-- Нижний бегунок -->
     <div id="hScroll" class="hscroll" aria-label="Горизонтальная прокрутка">
@@ -149,178 +254,231 @@ foreach ($rows as $r) {
 </div>
 
 <script>
-    const bales = <?= json_encode($bales) ?>;
+    const ORDER  = <?= json_encode($order) ?>;
+    const BALES  = <?= json_encode($bales, JSON_UNESCAPED_UNICODE) ?>;
+
+    // Выбранные ячейки: { "YYYY-MM-DD": ["baleId1","baleId2", ...], ... }
     let selected = {};
 
-    function drawTable() {
-        const start = new Date(document.getElementById('startDate').value);
-        const days = parseInt(document.getElementById('daysCount').value);
-        if (!start || isNaN(days)) return;
+    // сервис: экранирование в CSS-селекторе (fallback — без него)
+    const cssEsc = (s)=> (window.CSS && CSS.escape) ? CSS.escape(s) : String(s).replace(/"/g,'\\"');
 
+    async function drawTable() {
+        const startVal = document.getElementById('startDate').value;
+        const days = parseInt(document.getElementById('daysCount').value);
+        if (!startVal || isNaN(days)) return;
+
+        const start = new Date(startVal);
         const container = document.getElementById('planArea');
         container.innerHTML = '';
 
-        const table = document.createElement('table');
-        const thead = document.createElement('thead');
-        const headRow = document.createElement('tr');
-        headRow.innerHTML = '<th>Бухта</th>';
+        const table  = document.createElement('table');
+        const thead  = document.createElement('thead');
+        const headTr = document.createElement('tr');
+
+        headTr.innerHTML = '<th>Бухта</th>';
+        const dates = [];
         for (let d = 0; d < days; d++) {
             const date = new Date(start);
             date.setDate(start.getDate() + d);
-            const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD
-            headRow.innerHTML += `<th>${dateStr}</th>`;
+            const iso = date.toISOString().split('T')[0]; // YYYY-MM-DD
+            dates.push(iso);
+            headTr.innerHTML += `<th>${iso}</th>`;
         }
-        thead.appendChild(headRow);
+        thead.appendChild(headTr);
         table.appendChild(thead);
 
         const tbody = document.createElement('tbody');
-        Object.entries(bales).forEach(([baleId, rolls]) => {
-            const row = document.createElement('tr');
+
+        Object.entries(BALES).forEach(([baleId, rolls])=>{
+            const tr = document.createElement('tr');
 
             const heights = rolls.map(r => `[${r.height}]`).join(' ');
             const tooltip = rolls.map(r => `${r.filter} [${r.height}] ${r.width}`).join('\n');
 
-            const cell = document.createElement('td');
-            cell.innerHTML = `<strong>Бухта ${baleId}</strong><div class="bale-label">${heights}</div>`;
-            cell.title = tooltip;
-            row.appendChild(cell);
+            const td0 = document.createElement('td');
+            td0.innerHTML = `<strong>Бухта ${baleId}</strong><div class="bale-label">${heights}</div>`;
+            td0.title = tooltip;
+            tr.appendChild(td0);
 
-            for (let d = 0; d < days; d++) {
-                const date = new Date(start);
-                date.setDate(start.getDate() + d);
+            dates.forEach(iso=>{
                 const td = document.createElement('td');
-                td.dataset.date = date.toISOString().split('T')[0];
+                td.dataset.date   = iso;
                 td.dataset.baleId = baleId;
 
-                td.onclick = () => {
+                td.onclick = ()=>{
                     const sid = td.dataset.date;
                     const bid = td.dataset.baleId;
 
-                    const rowCells = document.querySelectorAll(`td[data-bale-id="${bid}"]`);
-                    rowCells.forEach(cell => {
-                        cell.classList.remove('highlight');
-                        const cellDate = cell.dataset.date;
-                        if (selected[cellDate] && selected[cellDate].includes(bid)) {
-                            selected[cellDate].splice(selected[cellDate].indexOf(bid), 1);
-                            if (selected[cellDate].length === 0) delete selected[cellDate];
+                    // снимаем выделение со всех ячеек этой бухты (в строке)
+                    document.querySelectorAll(`td[data-bale-id="${cssEsc(bid)}"]`).forEach(c=>{
+                        c.classList.remove('highlight');
+                        const d0 = c.dataset.date;
+                        if (selected[d0]) {
+                            const idx = selected[d0].indexOf(bid);
+                            if (idx>=0) selected[d0].splice(idx,1);
+                            if (selected[d0].length===0) delete selected[d0];
                         }
                     });
 
+                    // выделяем текущую
                     if (!selected[sid]) selected[sid] = [];
                     if (!selected[sid].includes(bid)) {
                         selected[sid].push(bid);
                         td.classList.add('highlight');
                     }
-
                     updateTotals();
                 };
 
-                row.appendChild(td);
-            }
+                tr.appendChild(td);
+            });
 
-            tbody.appendChild(row);
+            tbody.appendChild(tr);
         });
 
+        // строка итогов
         const totalRow = document.createElement('tr');
         totalRow.innerHTML = '<td><b>Загрузка (ч)</b></td>';
-        for (let d = 0; d < days; d++) {
-            const date = new Date(start);
-            date.setDate(start.getDate() + d);
-            const dateStr = date.toISOString().split('T')[0];
-            const td = document.createElement('td');
-            td.id = 'load-' + dateStr;
-            totalRow.appendChild(td);
-        }
+        dates.forEach(iso=>{
+            const t = document.createElement('td');
+            t.id = 'load-' + iso;
+            totalRow.appendChild(t);
+        });
         tbody.appendChild(totalRow);
 
         table.appendChild(tbody);
         container.appendChild(table);
 
-        // ★ УБРАНО: блок, который принудительно ставил 12px всем th
-        // Теперь ширина управляется CSS-переменной --dayW
-
-        // Кнопка «Сохранить»
+        // Кнопка «Сохранить план»
         const saveBtn = document.createElement('button');
         saveBtn.className = 'btn';
-        saveBtn.style.marginTop = '10px';
-        saveBtn.innerText = 'Сохранить план';
+        saveBtn.style.margin = '10px 0';
+        saveBtn.textContent = 'Сохранить план';
         saveBtn.onclick = savePlan;
         container.appendChild(saveBtn);
 
         // Нижний бегунок
         setupBottomScrollbar(container, table);
+
+        // Автоподгрузка сохранённого плана
+        try{
+            const plan = await loadSavedPlan();
+            applyPlan(plan);
+        }catch(e){
+            console.warn('План не загружен:', e);
+        }
     }
 
     function setupBottomScrollbar(container, table) {
-        const bar = document.getElementById('hScroll');
-        if (!bar) return;
+        const bar   = document.getElementById('hScroll');
         const inner = bar.querySelector('.hscroll-inner');
 
-        const updateWidth = () => { inner.style.width = table.scrollWidth + 'px'; };
-        updateWidth();
+        const syncWidth = ()=> { inner.style.width = table.scrollWidth + 'px'; };
+        syncWidth();
 
         if (window.ResizeObserver) {
-            const ro = new ResizeObserver(updateWidth);
+            const ro = new ResizeObserver(syncWidth);
             ro.observe(table);
         } else {
-            window.addEventListener('resize', updateWidth);
+            window.addEventListener('resize', syncWidth);
         }
 
         let lock = false;
-        bar.addEventListener('scroll', () => {
-            if (lock) return; lock = true;
-            container.scrollLeft = bar.scrollLeft;
-            lock = false;
-        });
-        container.addEventListener('scroll', () => {
-            if (lock) return; lock = true;
-            bar.scrollLeft = container.scrollLeft;
-            lock = false;
-        });
+        bar.addEventListener('scroll', ()=>{ if(lock) return; lock = true; container.scrollLeft = bar.scrollLeft; lock = false; });
+        container.addEventListener('scroll', ()=>{ if(lock) return; lock = true; bar.scrollLeft = container.scrollLeft; lock = false; });
     }
 
     function updateTotals() {
+        // Считаем нагрузку по дням: 1 бухта = 40 мин = 0.6667 ч
+        const minsPerBale = 40;
         const all = document.querySelectorAll('td.highlight');
-        const counter = {};
-        all.forEach(td => {
-            const date = td.dataset.date;
-            if (!counter[date]) counter[date] = 0;
-            counter[date]++;
+        const cnt = {};
+        all.forEach(td=>{
+            const d = td.dataset.date;
+            cnt[d] = (cnt[d]||0) + 1;
         });
 
-        for (const date in counter) {
-            const td = document.getElementById('load-' + date);
-            const hours = counter[date] * 40 / 60;
-            td.innerText = hours.toFixed(2);
-            td.className = hours > 7 ? 'overload' : '';
+        document.querySelectorAll('[id^="load-"]').forEach(td=>{
+            const date = td.id.replace('load-','');
+            const hours = ((cnt[date]||0) * minsPerBale) / 60;
+            td.textContent = (hours>0) ? hours.toFixed(2) : '';
+            td.className = (hours > 7) ? 'overload' : '';
+        });
+    }
+
+    async function savePlan(){
+        try{
+            const res = await fetch(location.pathname + '?action=save_assignments', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ order: ORDER, plan: selected })
+            });
+            const data = await res.json();
+            if (!data.ok) throw new Error(data.error || 'save failed');
+            alert('План сохранён');
+        }catch(e){
+            alert('Ошибка сохранения: ' + e.message);
         }
+    }
 
-        document.querySelectorAll('[id^=load-]').forEach(td => {
-            if (!td.innerText) {
-                td.className = '';
-                td.innerText = '';
-            }
+    async function loadSavedPlan(){
+        const res = await fetch(location.pathname + '?action=load_assignments&order=' + encodeURIComponent(ORDER));
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'load failed');
+        return data.plan || {};
+    }
+
+    function applyPlan(plan){
+        // один день на бухту: если в БД есть дубликаты, берём первое назначение
+        const chosen = new Map(); // bale_id -> date
+        Object.entries(plan).forEach(([date, list])=>{
+            if (!Array.isArray(list)) return;
+            list.forEach(bid=>{
+                const b = String(bid);
+                if (!chosen.has(b)) chosen.set(b, date);
+            });
         });
+
+        // сброс
+        document.querySelectorAll('td.highlight').forEach(el => el.classList.remove('highlight'));
+        selected = {};
+
+        // применяем
+        for (const [bid, date] of chosen.entries()){
+            // снимем выделение в строке
+            document.querySelectorAll(`td[data-bale-id="${cssEsc(bid)}"]`).forEach(c=>c.classList.remove('highlight'));
+
+            const td = document.querySelector(`td[data-bale-id="${cssEsc(bid)}"][data-date="${cssEsc(date)}"]`);
+            if (!td) continue;
+
+            if (!selected[date]) selected[date] = [];
+            if (!selected[date].includes(bid)) selected[date].push(bid);
+
+            td.classList.add('highlight');
+        }
+        updateTotals();
     }
 
-    function savePlan() {
-        const payload = { order: <?= json_encode($order) ?>, plan: selected };
+    // «Загрузить сохранённый» — по кнопке
+    document.getElementById('btnLoad').addEventListener('click', async ()=>{
+        // если таблица ещё не построена — построим её по текущим входам
+        if (!document.querySelector('#planArea table')) {
+            await drawTable();
+        }
+        try{
+            const plan = await loadSavedPlan();
+            applyPlan(plan);
+        }catch(e){
+            alert('Не удалось загрузить план: ' + e.message);
+        }
+    });
 
-        fetch('NP/save_roll_plan.php', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(payload)
-        })
-            .then(res => res.text())
-            .then(msg => {
-                if (msg.trim() === 'ok') {
-                    window.location.href = 'NP_cut_index.php';
-                } else {
-                    alert("Ошибка сохранения: " + msg);
-                }
-            })
-            .catch(err => alert("Ошибка: " + err));
-    }
+    // проставим стартовую дату сегодня
+    (function setToday(){
+        const el = document.getElementById('startDate');
+        const today = new Date(); today.setHours(12); // чтобы не попасть в перевод час.поясов
+        el.value = today.toISOString().slice(0,10);
+    })();
 </script>
 </body>
 </html>
