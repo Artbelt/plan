@@ -105,6 +105,11 @@ $advertisement = 'Информация';
         <a href="logout.php">Выход</a>
     </div>
 </header>
+<?php
+if (is_admin($user)){
+edit_access_button_draw();
+}
+?>
 
 <main>
     <!-- Блок операций -->

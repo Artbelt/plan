@@ -19,9 +19,9 @@ $by_date = [];
 foreach ($positions as $p) {
     $tooltip = "{$p['filter_label']} | Кол-во гофропакетов: {$p['count']}";
     $by_date[$p['plan_date']][] = [
-        'label' => $p['filter_label'],
+        'label'   => $p['filter_label'],
         'tooltip' => $tooltip,
-        'count' => $p['count']
+        'count'   => $p['count']
     ];
 }
 ?>
@@ -33,7 +33,8 @@ foreach ($positions as $p) {
     <style>
         body { font-family: sans-serif; font-size: 12px; padding: 20px; background: #f0f0f0; }
         table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
-        th, td { font-size: 11px; border: 1px solid #ccc; padding: 3px; vertical-align: top; white-space: normal; }
+        th, td { font-size: 11px; border: 1px solid #ccc; padding: 3px; vertical-align: top; white-space: normal; background: #fff; }
+        th { background: #fafafa; }
         .position-cell { display: block; margin-bottom: 2px; cursor: pointer; padding: 2px; font-size: 11px; border-bottom: 1px dotted #ccc; }
         .used { background-color: #ccc; color: #666; cursor: not-allowed; }
         .assigned-item {
@@ -47,7 +48,8 @@ foreach ($positions as $p) {
             width: 100%;
         }
         .half-width { width: 50%; float: left; box-sizing: border-box; }
-        .drop-target { min-height: 20px; min-width: 80px; position: relative; }
+        .drop-target { min-height: 20px; min-width: 90px; position: relative; }
+        .date-col { min-width: 90px; } /* удобная ширина для дат */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.4); justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 20px; border-radius: 5px; width: 400px; }
         .modal h3 { margin-top: 0; }
@@ -60,13 +62,36 @@ foreach ($positions as $p) {
         .hover-highlight { background-color: #ffe780 !important; transition: background-color 0.2s; }
         .highlight-col { background-color: #ffe6b3 !important; }
         .highlight-row { background-color: #fff3cd !important; }
+
+        /* --- Sticky колонки для нижней таблицы --- */
+        .table-wrap { position: relative; overflow: auto; border: 1px solid #ddd; background: #fff; }
+        #bottom-table { width: max(100%, 1200px); } /* чтобы был горизонтальный скролл при множестве дней */
+        .sticky-left, .sticky-right {
+            position: sticky;
+            z-index: 3;
+            background: #fff; /* не прозрачно над содержимым */
+        }
+        th.sticky-left, td.sticky-left {
+            left: 0;
+            z-index: 4; /* поверх обычных ячеек */
+            box-shadow: 2px 0 0 rgba(0,0,0,0.06);
+            min-width: 60px;
+            text-align: center;
+        }
+        th.sticky-right, td.sticky-right {
+            right: 0;
+            z-index: 4;
+            box-shadow: -2px 0 0 rgba(0,0,0,0.06);
+            min-width: 60px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
 <h2>Планирование сборки для заявки <?= htmlspecialchars($order) ?></h2>
 <form method="get" style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
     Дата начала: <input type="date" name="start" value="<?= htmlspecialchars($_GET['start'] ?? date('Y-m-d')) ?>">
-    Дней: <input type="number" name="days" value="<?= $days ?>" min="1" max="30">
+    Дней: <input type="number" name="days" value="<?= $days ?>" min="1" max="90">
     <input type="hidden" name="order" value="<?= htmlspecialchars($order) ?>">
     <button type="submit">Построить таблицу</button>
     <button type="button" onclick="addDay()">Добавить день</button>
@@ -79,7 +104,7 @@ foreach ($positions as $p) {
 <table id="top-table">
     <tr>
         <?php foreach ($dates as $d): ?>
-            <th><?= $d ?></th>
+            <th class="date-col"><?= $d ?></th>
         <?php endforeach; ?>
     </tr>
     <tr>
@@ -107,26 +132,32 @@ foreach ($positions as $p) {
 <h3>Планирование сборки</h3>
 <form method="post" action="NP/save_build_plan.php">
     <input type="hidden" name="order" value="<?= htmlspecialchars($order) ?>">
-    <table id="bottom-table">
-        <thead>
-        <tr>
-            <th>Место</th>
-            <?php foreach ($dates as $d): ?>
-                <th><?= $d ?></th>
-            <?php endforeach; ?>
-        </tr>
-        </thead>
-        <tbody>
-        <?php for ($place = 1; $place <= 17; $place++): ?>
+
+    <div class="table-wrap">
+        <table id="bottom-table">
+            <thead>
             <tr>
-                <td><?= $place ?></td>
+                <th class="sticky-left">Место</th>
                 <?php foreach ($dates as $d): ?>
-                    <td class="drop-target" data-date="<?= $d ?>" data-place="<?= $place ?>"></td>
+                    <th class="date-col"><?= $d ?></th>
                 <?php endforeach; ?>
+                <th class="sticky-right" id="right-sticky-header">Место</th>
             </tr>
-        <?php endfor; ?>
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+            <?php for ($place = 1; $place <= 17; $place++): ?>
+                <tr>
+                    <td class="sticky-left"><?= $place ?></td>
+                    <?php foreach ($dates as $d): ?>
+                        <td class="drop-target date-col" data-date="<?= $d ?>" data-place="<?= $place ?>"></td>
+                    <?php endforeach; ?>
+                    <td class="sticky-right"><?= $place ?></td>
+                </tr>
+            <?php endfor; ?>
+            </tbody>
+        </table>
+    </div>
+
     <input type="hidden" name="plan_data" id="plan_data">
     <button type="submit" onclick="preparePlan()">Сохранить план</button>
 </form>
@@ -181,15 +212,20 @@ foreach ($positions as $p) {
             selectedId = cell.dataset.id;
             const modalDates = document.getElementById("modal-dates");
             modalDates.innerHTML = "";
-            document.querySelectorAll('#bottom-table thead th').forEach((th, i) => {
-                if (i > 0 && th.innerText >= selectedCutDate) {
-                    const btn = document.createElement("button");
-                    btn.innerText = th.innerText;
-                    btn.onclick = () => {
-                        selectedDate = th.innerText;
-                        renderPlacesForDate(selectedDate);
-                    };
-                    modalDates.appendChild(btn);
+            // собираем список дат из заголовков нижней таблицы, исключая левый и правый sticky
+            const ths = Array.from(document.querySelectorAll('#bottom-table thead th'));
+            ths.forEach((th, i) => {
+                if (i > 0 && i < ths.length - 1) {
+                    const dateStr = th.innerText.trim();
+                    if (dateStr >= selectedCutDate) {
+                        const btn = document.createElement("button");
+                        btn.innerText = dateStr;
+                        btn.onclick = () => {
+                            selectedDate = dateStr;
+                            renderPlacesForDate(selectedDate);
+                        };
+                        modalDates.appendChild(btn);
+                    }
                 }
             });
             document.getElementById("modal").style.display = "flex";
@@ -237,11 +273,12 @@ foreach ($positions as $p) {
     function distributeToBuildPlan(startDate, place) {
         let total = parseInt(document.querySelector(`.position-cell[data-id="${selectedId}"]`).dataset.count);
         const fillsPerDay = parseInt(document.getElementById("fills_per_day").value || "50");
-        const dates = Array.from(document.querySelectorAll('#bottom-table thead th'))
-            .slice(1).map(th => th.innerText).filter(date => date >= startDate);
+        const dateHeaders = Array.from(document.querySelectorAll('#bottom-table thead th'));
+        const dateList = dateHeaders.slice(1, dateHeaders.length - 1).map(th => th.innerText).filter(d => d >= startDate);
+
         let dateIndex = 0;
-        while (total > 0 && dateIndex < dates.length) {
-            const td = document.querySelector(`.drop-target[data-date='${dates[dateIndex]}'][data-place='${place}']`);
+        while (total > 0 && dateIndex < dateList.length) {
+            const td = document.querySelector(`.drop-target[data-date='${dateList[dateIndex]}'][data-place='${place}']`);
             if (td) {
                 let alreadyInCell = 0;
                 td.querySelectorAll('.assigned-item').forEach(item => {
@@ -290,14 +327,18 @@ foreach ($positions as $p) {
     function addDay() {
         const topTable = document.getElementById('top-table');
         const bottomTable = document.getElementById('bottom-table');
-        const lastDateCell = bottomTable.querySelector('thead th:last-child');
-        const lastDate = new Date(lastDateCell.innerText);
+
+        // последняя дата = предпоследний th (перед правым sticky)
+        const ths = bottomTable.querySelectorAll('thead th');
+        const lastDateTh = ths[ths.length - 2];
+        const lastDate = new Date(lastDateTh.innerText);
         lastDate.setDate(lastDate.getDate() + 1);
         const newDateStr = lastDate.toISOString().split('T')[0];
 
         // Верхняя таблица
         const topHeaderRow = topTable.querySelector('tr:first-child');
         const newTopTh = document.createElement('th');
+        newTopTh.className = 'date-col';
         newTopTh.innerText = newDateStr;
         topHeaderRow.appendChild(newTopTh);
 
@@ -305,65 +346,83 @@ foreach ($positions as $p) {
         const newTopTd = document.createElement('td');
         topSecondRow.appendChild(newTopTd);
 
-        // Нижняя таблица
+        // Нижняя таблица: вставляем ПЕРЕД правым sticky
         const bottomHeaderRow = bottomTable.querySelector('thead tr');
+        const rightStickyHeader = document.getElementById('right-sticky-header');
         const newBottomTh = document.createElement('th');
+        newBottomTh.className = 'date-col';
         newBottomTh.innerText = newDateStr;
-        bottomHeaderRow.appendChild(newBottomTh);
+        bottomHeaderRow.insertBefore(newBottomTh, rightStickyHeader);
 
         const bottomRows = bottomTable.querySelectorAll('tbody tr');
         bottomRows.forEach(row => {
-            const place = row.querySelector('td:first-child').innerText;
+            const place = row.querySelector('td.sticky-left').innerText;
             const newTd = document.createElement('td');
-            newTd.classList.add('drop-target');
+            newTd.classList.add('drop-target', 'date-col');
             newTd.setAttribute('data-date', newDateStr);
             newTd.setAttribute('data-place', place);
-            row.appendChild(newTd);
+            const rightSticky = row.querySelector('td.sticky-right');
+            row.insertBefore(newTd, rightSticky);
         });
 
-        // Перепривязываем обработчики для новых ячеек
         addTableHoverEffect();
     }
-
 
     function removeDay() {
         const topTable = document.getElementById('top-table');
         const bottomTable = document.getElementById('bottom-table');
+
+        // Удаляем последнюю дату ПЕРЕД правым sticky
+        const ths = bottomTable.querySelectorAll('thead th');
+        if (ths.length <= 3) return; // минимум: левый, один день, правый
+        const lastDateTh = ths[ths.length - 2];
+        const dateStr = lastDateTh.innerText;
+        lastDateTh.remove();
+
+        // Верх: убираем последний столбец
         const topHeaders = topTable.querySelectorAll('tr:first-child th');
-        if (topHeaders.length <= 1) return;
-        topHeaders[topHeaders.length - 1].remove();
+        if (topHeaders.length > 0) topHeaders[topHeaders.length - 1].remove();
         const topRows = topTable.querySelectorAll('tr:nth-child(2) td');
         if (topRows.length > 0) topRows[topRows.length - 1].remove();
-        const bottomHeaders = bottomTable.querySelectorAll('thead th');
-        if (bottomHeaders.length <= 2) return;
-        bottomHeaders[bottomHeaders.length - 1].remove();
+
+        // Низ: убрать ячейки с этой датой
         const bottomRows = bottomTable.querySelectorAll('tbody tr');
         bottomRows.forEach(row => {
-            const cells = row.querySelectorAll('td');
-            if (cells.length > 1) cells[cells.length - 1].remove();
+            const cells = Array.from(row.querySelectorAll('td.drop-target'));
+            const cellToRemove = cells.find(td => td.getAttribute('data-date') === dateStr);
+            if (cellToRemove) cellToRemove.remove();
         });
     }
 
     function addTableHoverEffect() {
         const bottomTable = document.getElementById('bottom-table');
         const rows = bottomTable.querySelectorAll('tbody tr');
+        const ths = bottomTable.querySelectorAll('thead th');
         rows.forEach(row => {
             const cells = row.querySelectorAll('td.drop-target');
-            cells.forEach((cell, cellIndex) => {
+            cells.forEach((cell) => {
                 cell.addEventListener('mouseenter', () => {
+                    // Подсветим всю строку
                     row.querySelectorAll('td').forEach(td => td.classList.add('highlight-row'));
-                    const allRows = bottomTable.querySelectorAll('tbody tr');
-                    allRows.forEach(r => {
-                        const c = r.querySelectorAll('td')[cellIndex + 1];
-                        if (c) c.classList.add('highlight-col');
-                    });
-                    const ths = bottomTable.querySelectorAll('thead th');
-                    if (ths[cellIndex + 1]) ths[cellIndex + 1].classList.add('highlight-col');
+                    // Подсветим соответствующий столбец: находим индекс th по дате
+                    const date = cell.getAttribute('data-date');
+                    let colIndex = -1;
+                    ths.forEach((th, idx) => { if (th.innerText.trim() === date) colIndex = idx; });
+                    if (colIndex > -1) {
+                        // Подсветить этот th
+                        ths[colIndex].classList.add('highlight-col');
+                        // И каждую ячейку в этом столбце (пробегаем строки)
+                        bottomTable.querySelectorAll('tbody tr').forEach(r => {
+                            const tds = r.querySelectorAll('td');
+                            if (tds[colIndex]) tds[colIndex].classList.add('highlight-col');
+                        });
+                    }
                 });
                 cell.addEventListener('mouseleave', () => {
-                    row.querySelectorAll('td').forEach(td => td.classList.remove('highlight-row'));
-                    const allCells = bottomTable.querySelectorAll('td, th');
-                    allCells.forEach(c => c.classList.remove('highlight-col'));
+                    bottomTable.querySelectorAll('td, th').forEach(c => {
+                        c.classList.remove('highlight-col');
+                        c.classList.remove('highlight-row');
+                    });
                 });
             });
         });

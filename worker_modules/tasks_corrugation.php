@@ -101,6 +101,21 @@ $plans = $stmt->fetchAll(PDO::FETCH_ASSOC);
 <body>
 
 <h2>Задания гофромашины на <?= htmlspecialchars($date) ?></h2>
+<div style="text-align:center; margin-bottom:10px; font-size:18px;">
+    <a href="?date=<?= date('Y-m-d', strtotime($date.' -1 day')) ?>"
+       style="margin-right:20px; text-decoration:none; display:inline-block;
+              width:32px; height:32px; line-height:32px; border-radius:50%;
+              background:#2563eb; color:#fff; font-weight:bold;">&#9664;</a>
+
+    <strong><?= htmlspecialchars($date) ?></strong>
+
+    <a href="?date=<?= date('Y-m-d', strtotime($date.' +1 day')) ?>"
+       style="margin-left:20px; text-decoration:none; display:inline-block;
+              width:32px; height:32px; line-height:32px; border-radius:50%;
+              background:#2563eb; color:#fff; font-weight:bold;">&#9654;</a>
+</div>
+
+
 <form method="get">
     Дата:
     <input type="date" name="date" value="<?= htmlspecialchars($date) ?>">
