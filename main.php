@@ -159,6 +159,10 @@ edit_access_button_draw();
             <input type="hidden" name="workshop" value="<?= htmlspecialchars($workshop) ?>">
             <input type="submit" value="Модуль оператора бумагорезки">
         </form>
+        <form action="worker_modules/tasks_for_builders.php" method="post" target="_blank">
+            <input type="hidden" name="workshop" value="<?= htmlspecialchars($workshop) ?>">
+            <input type="submit" value="План для сборщиц">
+        </form>
     </div>
 
     <!-- Блок заявок -->

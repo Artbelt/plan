@@ -1,4 +1,63 @@
 <?php
+// NP_cut_index.php
+$dsn = "mysql:host=127.0.0.1;dbname=plan;charset=utf8mb4";
+$user = "root"; $pass = "";
+
+/* ================= AJAX: CLEAR ================= */
+if (isset($_GET['action']) && $_GET['action'] === 'clear') {
+    header('Content-Type: application/json; charset=utf-8');
+    try{
+        $raw = file_get_contents('php://input');
+        $in  = json_decode($raw, true);
+        $order = $in['order'] ?? ($_POST['order'] ?? '');
+        if ($order === '') { http_response_code(400); echo json_encode(['ok'=>false,'error'=>'no order']); exit; }
+
+        $pdo = new PDO($dsn,$user,$pass,[
+            PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC
+        ]);
+        $pdo->beginTransaction();
+
+        $aff = ['cut_plans'=>0,'roll_plans'=>0,'corr'=>0,'build'=>0,'orders'=>0];
+
+        // Удаления (таблицы из текущего проекта)
+        foreach ([
+                     ['sql'=>"DELETE FROM build_plan WHERE order_number=?", 'key'=>'build'],
+                     ['sql'=>"DELETE FROM corrugation_plan WHERE order_number=?", 'key'=>'corr'],
+                     ['sql'=>"DELETE FROM roll_plans WHERE order_number=?", 'key'=>'roll_plans'],
+                     ['sql'=>"DELETE FROM cut_plans WHERE order_number=?", 'key'=>'cut_plans'],
+                 ] as $q){
+            try{
+                $st = $pdo->prepare($q['sql']);
+                $st->execute([$order]);
+                $aff[$q['key']] = $st->rowCount();
+            } catch(Throwable $e){
+                // если таблицы нет — молча игнорируем
+            }
+        }
+
+        // Сброс статусов в orders (только существующие поля)
+        $cols = $pdo->query("SELECT COLUMN_NAME FROM information_schema.COLUMNS
+                             WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='orders'")->fetchAll(PDO::FETCH_COLUMN);
+        $want = ['cut_ready','cut_confirmed','plan_ready','corr_ready','build_ready'];
+        $set  = [];
+        foreach($want as $c){ if(in_array($c,$cols,true)) $set[] = "$c=0"; }
+        if ($set){
+            $sql = "UPDATE orders SET ".implode(',', $set)." WHERE order_number=?";
+            $st  = $pdo->prepare($sql); $st->execute([$order]);
+            $aff['orders'] = $st->rowCount();
+        }
+
+        $pdo->commit();
+        echo json_encode(['ok'=>true,'aff'=>$aff]); exit;
+    }catch(Throwable $e){
+        if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
+        http_response_code(500); echo json_encode(['ok'=>false,'error'=>$e->getMessage()]); exit;
+    }
+}
+
+
+
 $pdo = new PDO("mysql:host=127.0.0.1;dbname=plan;charset=utf8mb4", "root", "", [
     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
 ]);
@@ -69,7 +128,13 @@ $corr_done = array_flip($stmt->fetchAll(PDO::FETCH_COLUMN));
 
         <?php foreach ($orders as $o): $ord = $o['order_number']; ?>
             <tr>
-                <td><?= htmlspecialchars($ord) ?></td>
+                <td>
+                    <?= htmlspecialchars($ord) ?>
+                    <div class="stack" style="margin-top:6px">
+                        <button class="btn-danger" onclick="clearOrder('<?= htmlspecialchars($ord, ENT_QUOTES) ?>')">Очистить всё</button>
+                    </div>
+                    <span class="sub">Удалит раскрой, раскладку по дням, гофро- и сборочный планы, а также сбросит статусы.</span>
+                </td>
 
                 <!-- Раскрой (подготовка) -->
                 <td>
@@ -161,5 +226,33 @@ $corr_done = array_flip($stmt->fetchAll(PDO::FETCH_COLUMN));
         <?php endforeach; ?>
     </table>
 </div>
+<script>
+    // Очистка плана целиком
+    async function clearOrder(order){
+        if (!confirm('Очистить ВСЁ планирование по заявке '+order+'?\nБудут удалены: раскрой, раскладка по дням, гофро- и сборочный планы.\nСтатусы заявки будут сброшены.')) return;
+        try{
+            const res = await fetch('NP_cut_index.php?action=clear', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json', 'Accept':'application/json'},
+                body: JSON.stringify({order})
+            });
+            let data;
+            try{ data = await res.json(); }
+            catch(e){
+                const t = await res.text();
+                throw new Error('Backend вернул не JSON:\n'+t.slice(0,500));
+            }
+            if (!data.ok) throw new Error(data.error || 'unknown');
+            alert('Готово. Удалено записей:\n' +
+                'cut_plans: '+(data.aff?.cut_plans ?? 0)+'\n' +
+                'roll_plans: '+(data.aff?.roll_plans ?? 0)+'\n' +
+                'corrugation_plan: '+(data.aff?.corr ?? 0)+'\n' +
+                'build_plan: '+(data.aff?.build ?? 0));
+            location.reload();
+        }catch(e){
+            alert('Не удалось очистить: '+e.message);
+        }
+    }
+</script>
 </body>
 </html>

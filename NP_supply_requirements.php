@@ -1,13 +1,20 @@
 <?php
-// NP_supply_by_order.php — потребность по конкретной заявке, пивот "дни × позиции"
+// NP_supply_by_order.php — потребность по конкретной заявке
+// Печать: таблица разбивается на несколько страниц по N дат (по умолчанию 20)
+// Режим: "Недельные итоги" — после каждого воскресенья добавляется столбец с суммой за неделю (ISO: пн–вс)
+
 $pdo = new PDO("mysql:host=127.0.0.1;dbname=plan;charset=utf8mb4","root","",[
     PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION
 ]);
 
-// ----- AJAX: отрисовать только таблицу -----
+/* ===== AJAX: отрисовать только таблицы ===== */
 if (isset($_GET['ajax']) && $_GET['ajax']=='1') {
-    $order = $_POST['order'] ?? '';
-    $ctype = $_POST['ctype'] ?? ''; // wireframe | prefilter | box | g_box
+    $order     = $_POST['order']  ?? '';
+    $ctype     = $_POST['ctype']  ?? '';           // wireframe | prefilter | box | g_box
+    $chunkSize = (int)($_POST['chunk'] ?? 20);     // сколько дат на одну «страницу»
+    $withWeekly= (($_POST['weekcols'] ?? '0') === '1'); // добавлять недельные итоги?
+    if ($chunkSize <= 0) $chunkSize = 20;
+
     if ($order==='' || $ctype==='') {
         http_response_code(400);
         echo "<p>Не указана заявка или тип комплектующих.</p>";
@@ -69,9 +76,9 @@ if (isset($_GET['ajax']) && $_GET['ajax']=='1') {
         exit;
     }
 
-    // Собираем пивот: колонки — даты; строки — component_name
-    $dates = [];       // упорядоченный список дат
-    $items = [];       // список компонент (имена строк)
+    // Пивот-структура
+    $dates  = [];      // список дат
+    $items  = [];      // строки (компоненты)
     $matrix = [];      // matrix[item][date] = qty
     foreach ($rows as $r) {
         $d = $r['need_by_date'];
@@ -83,57 +90,108 @@ if (isset($_GET['ajax']) && $_GET['ajax']=='1') {
 
         if (!isset($matrix[$name])) $matrix[$name] = [];
         if (!isset($matrix[$name][$d])) $matrix[$name][$d] = 0;
-        $matrix[$name][$d] += (float)$r['qty']; // схлопываем на случай дублей в build_plan
+        $matrix[$name][$d] += (float)$r['qty'];
     }
     $dates = array_keys($dates);
     sort($dates);
     $items = array_keys($items);
     sort($items, SORT_NATURAL|SORT_FLAG_CASE);
 
-    // Формат
+    // Для недельных сумм: карта дата -> isoYear-week
+    $weekOf = [];
+    foreach ($dates as $d) {
+        $ts = strtotime($d);
+        $weekOf[$d] = date('o-\WW', $ts); // например: 2025-W36
+    }
+
+    // Предрасчёт недельных сумм по каждой позиции и общих итого по неделям
+    $rowWeekSum = [];           // [item][isoWeek] = sum
+    $weekTotals = [];           // [isoWeek] = sum по всем item
+    foreach ($items as $name) {
+        foreach ($dates as $d) {
+            $wk = $weekOf[$d];
+            $v  = $matrix[$name][$d] ?? 0;
+            if (!isset($rowWeekSum[$name][$wk])) $rowWeekSum[$name][$wk] = 0;
+            $rowWeekSum[$name][$wk] += $v;
+
+            if (!isset($weekTotals[$wk])) $weekTotals[$wk] = 0;
+            $weekTotals[$wk] += $v;
+        }
+    }
+
     $titleMap = ['wireframe'=>'каркас','prefilter'=>'предфильтр','box'=>'индивидуальная коробка','g_box'=>'групповая коробка'];
     $title = $titleMap[$ctype] ?? $ctype;
 
-    // Рендер таблицы
+    // Хелпер форматирования
     function fmt($x){ return rtrim(rtrim(number_format((float)$x,3,'.',''), '0'), '.'); }
 
+    // Заголовок для печати (один раз)
     echo "<h3 class=\"subtitle\">Заявка ".htmlspecialchars($order).": потребность — ".htmlspecialchars($title)."</h3>";
-    echo '<div class="table-wrap"><table class="pivot">';
-    echo '<thead><tr><th class="left">Позиция</th>';
-    foreach ($dates as $d) {
-        echo '<th class="nowrap vertical-date">' . date('d-m-y', strtotime($d)) . '</th>';
-    }
-    echo '<th class="nowrap">Итого</th></tr></thead><tbody>';
 
-    foreach ($items as $name) {
-        $rowTotal = 0;
-        echo '<tr><td class="left">'.htmlspecialchars($name).'</td>';
-        foreach ($dates as $d) {
-            $v = $matrix[$name][$d] ?? 0;
-            $rowTotal += $v;
-            echo '<td>'.($v ? fmt($v) : '').'</td>';
+    // Разбиение дат на чанки
+    $dateChunks = array_chunk($dates, $chunkSize, true);
+
+    foreach ($dateChunks as $i => $chunkDates) {
+        echo '<div class="sheet">';                   // оболочка страницы
+        echo '<div class="table-wrap"><table class="pivot">';
+        echo '<thead><tr><th class="left">Позиция</th>';
+        foreach ($chunkDates as $d) {
+            $ts = strtotime($d);
+            echo '<th class="nowrap vertical-date">' . date('d-m-y', $ts) . '</th>';
+            if ($withWeekly && date('N', $ts) == 7) { // 7 = воскресенье (ISO)
+                $wk = $weekOf[$d];                    // 2025-W36
+                echo '<th class="nowrap weekcol-h">∑ '.htmlspecialchars($wk).'</th>';
+            }
         }
-        echo '<td class="total">'.fmt($rowTotal).'</td></tr>';
+        echo '<th class="nowrap">Итого</th></tr></thead><tbody>';
+
+        // Строки с позициями
+        foreach ($items as $name) {
+            $rowTotal = 0;
+            echo '<tr><td class="left">'.htmlspecialchars($name).'</td>';
+            foreach ($chunkDates as $d) {
+                $ts = strtotime($d);
+                $v  = $matrix[$name][$d] ?? 0;
+                $rowTotal += $v;
+                echo '<td>'.($v ? fmt($v) : '').'</td>';
+
+                if ($withWeekly && date('N', $ts) == 7) {
+                    $wk   = $weekOf[$d];
+                    $wSum = $rowWeekSum[$name][$wk] ?? 0;
+                    echo '<td class="weekcol">'.($wSum ? fmt($wSum) : '').'</td>';
+                }
+            }
+            echo '<td class="total">'.fmt($rowTotal).'</td></tr>';
+        }
+
+        // Итоги по датам + недельные итоги в этом чанке
+        echo '<tr class="foot"><td class="left nowrap">Итого по дням</td>';
+        $grand = 0;
+        foreach ($chunkDates as $d) {
+            $col = 0;
+            foreach ($items as $name) $col += $matrix[$name][$d] ?? 0;
+            $grand += $col;
+            echo '<td class="total">'.($col?fmt($col):'').'</td>';
+
+            $ts = strtotime($d);
+            if ($withWeekly && date('N', $ts) == 7) {
+                $wk = $weekOf[$d];
+                $ws = $weekTotals[$wk] ?? 0;
+                echo '<td class="weekcol-g">'.($ws?fmt($ws):'').'</td>';
+            }
+        }
+        echo '<td class="grand">'.fmt($grand).'</td></tr>';
+
+        echo '</tbody></table></div>'; // table-wrap
+        echo '</div>'; // sheet
     }
 
-    // Итог по датам
-    echo '<tr class="foot"><td class="left nowrap">Итого по дням</td>';
-    $grand = 0;
-    foreach ($dates as $d) {
-        $col = 0;
-        foreach ($items as $name) $col += $matrix[$name][$d] ?? 0;
-        $grand += $col;
-        echo '<td class="total">'.($col?fmt($col):'').'</td>';
-    }
-    echo '<td class="grand">'.fmt($grand).'</td></tr>';
-
-    echo '</tbody></table></div>';
     exit;
 }
 
-// ----- обычная загрузка страницы -----
+/* ===== обычная загрузка страницы ===== */
 
-// Список заявок (из build_plan и/или orders)
+// Список заявок
 $orders = $pdo->query("SELECT DISTINCT order_number FROM build_plan ORDER BY order_number")->fetchAll(PDO::FETCH_COLUMN);
 ?>
 <!DOCTYPE html>
@@ -146,26 +204,29 @@ $orders = $pdo->query("SELECT DISTINCT order_number FROM build_plan ORDER BY ord
         :root{
             --bg:#f6f7fb; --card:#ffffff; --text:#111827; --muted:#6b7280;
             --line:#e5e7eb; --accent:#2563eb; --accent-soft:#eaf1ff;
+            --week-h:#ffe6bf; --week:#fff6e8; --week-g:#fff0d6;
         }
         *{box-sizing:border-box}
         body{
             font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
             background:var(--bg); color:var(--text);
-            margin:0; padding:10px; font-size:13px;      /* поменьше шрифт */
+            margin:0; padding:10px; font-size:13px;
         }
         h2{margin:6px 0 12px;text-align:center}
         .panel{
             max-width:1100px;margin:0 auto 12px;background:#fff;border-radius:10px;
-            padding:12px;box-shadow:0 1px 4px rgba(0,0,0,.08);display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center
+            padding:12px;box-shadow:0 1px 4px rgba(0,0,0,.08);
+            display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:center
         }
-        .vertical-date {
-            writing-mode: vertical-rl; /* Поворот текста вертикально */
-            transform: rotate(180deg); /* Чтобы шло снизу вверх или сверху вниз */
+        .vertical-date{
+            writing-mode: vertical-rl;
+            transform: rotate(180deg);
             white-space: nowrap;
             padding: 4px;
         }
-        label{white-space:nowrap}
+        label{white-space:nowrap; display:flex; align-items:center; gap:6px}
         select,button{padding:7px 10px;font-size:13px;border:1px solid var(--line);border-radius:8px;background:#fff}
+        input[type="checkbox"]{transform:translateY(1px)}
         button{cursor:pointer;font-weight:600}
         .btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
         .btn-soft{background:var(--accent-soft);color:var(--accent);border-color:#cfe0ff}
@@ -173,26 +234,41 @@ $orders = $pdo->query("SELECT DISTINCT order_number FROM build_plan ORDER BY ord
 
         .subtitle{margin:6px 0 8px}
 
-        .table-wrap{overflow-x:auto;background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:10px}
-        table.pivot{border-collapse:collapse;width:100%;min-width:640px;font-size:12.5px}
+        .table-wrap{overflow-x:auto;background:#fff;border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:10px;margin-bottom:14px}
+        table.pivot{border-collapse:collapse;width:100%;min-width:640px;font-size:12.5px;table-layout:fixed}
         table.pivot th, table.pivot td{border:1px solid #ddd;padding:5px 7px;text-align:center;vertical-align:middle}
         table.pivot thead th{background:#f0f0f0;font-weight:600}
         .left{text-align:left;white-space:normal}
-        .nowrap{white-space:nowrap}         /* даты не переносятся */
+        .nowrap{white-space:nowrap}
         table.pivot td.total{background:#f9fafb;font-weight:bold}
         table.pivot tr.foot td{background:#eef6ff;font-weight:bold}
         table.pivot td.grand{background:#e6ffe6;font-weight:bold}
         tbody tr:nth-child(even){background:#fafafa}
+
+        /* Недельные колонки */
+        .weekcol-h{background:var(--week-h) !important; font-weight:600;}
+        .weekcol{background:var(--week) !important; font-weight:600;}
+        .weekcol-g{background:var(--week-g) !important; font-weight:700;}
+
         @media(max-width:700px){ select,button{width:100%} }
 
-        /* Печать */
+        /* Блок-страница для печати каждой части */
+        .sheet{page-break-after:always;}
+        .sheet:last-child{page-break-after:auto;}
+
         @media print{
-            @page { size: landscape; margin: 10mm; }
+            @page { size: A4 landscape; margin: 10mm; }
             body{background:#fff}
-            .panel{display:none}
-            .table-wrap{box-shadow:none;border-radius:0;padding:0}
-            table.pivot{font-size:11px}
-            table.pivot thead th, table.pivot td{ -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .panel{display:none !important}
+            .table-wrap{box-shadow:none;border-radius:0;padding:0;overflow:visible}
+            table.pivot{font-size:11px;min-width:0 !important;width:auto}
+            table.pivot th, table.pivot td{
+                padding:3px 4px !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+                white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+            }
+            .vertical-date{padding:2px !important;letter-spacing:.2px}
         }
     </style>
 </head>
@@ -218,6 +294,16 @@ $orders = $pdo->query("SELECT DISTINCT order_number FROM build_plan ORDER BY ord
         <option value="g_box">Коробка групповая</option>
     </select>
 
+    <label>Дат на страницу:
+        <select id="chunk">
+            <?php foreach ([12,16,20,24,28,32] as $n): ?>
+                <option value="<?= $n ?>" <?= $n==20?'selected':'' ?>><?= $n ?></option>
+            <?php endforeach; ?>
+        </select>
+    </label>
+
+    <label><input type="checkbox" id="weekcols"> Недельные итоги</label>
+
     <button class="btn-primary" onclick="loadPivot()">Показать потребность</button>
     <button class="btn-soft" onclick="window.print()">Печать</button>
 </div>
@@ -226,21 +312,31 @@ $orders = $pdo->query("SELECT DISTINCT order_number FROM build_plan ORDER BY ord
 
 <script>
     function loadPivot(){
-        const order = document.getElementById('order').value;
-        const ctype = document.getElementById('ctype').value;
+        const order    = document.getElementById('order').value;
+        const ctype    = document.getElementById('ctype').value;
+        const chunk    = document.getElementById('chunk').value;
+        const weekcols = document.getElementById('weekcols').checked ? 1 : 0;
         if(!order){ alert('Выберите заявку'); return; }
         if(!ctype){ alert('Выберите тип комплектующих'); return; }
 
         const xhr = new XMLHttpRequest();
         xhr.onreadystatechange=function(){
             if(this.readyState===4){
-                if(this.status===200) document.getElementById('result').innerHTML = this.responseText;
-                else alert('Ошибка загрузки: '+this.status);
+                if(this.status===200){
+                    document.getElementById('result').innerHTML = this.responseText;
+                }else{
+                    alert('Ошибка загрузки: '+this.status);
+                }
             }
         };
         xhr.open('POST','?ajax=1',true);
         xhr.setRequestHeader('Content-Type','application/x-www-form-urlencoded');
-        xhr.send('order='+encodeURIComponent(order)+'&ctype='+encodeURIComponent(ctype));
+        xhr.send(
+            'order='+encodeURIComponent(order)+
+            '&ctype='+encodeURIComponent(ctype)+
+            '&chunk='+encodeURIComponent(chunk)+
+            '&weekcols='+encodeURIComponent(weekcols)
+        );
     }
 </script>
 </body>
