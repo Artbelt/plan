@@ -216,6 +216,62 @@ edit_access_button_draw();
 <footer>
     <?= $advertisement ?>
 </footer>
+<div style="max-width:600px;padding:12px;border:1px solid #ddd;border-radius:10px;margin:12px 0;">
+    <h4 style="margin:0 0 8px;">Поиск заявок по фильтру</h4>
 
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <label for="filterSelect">Фильтр:</label>
+        <?php
+        load_filters_into_select('Выберите фильтр'); // <select name="analog_filter">
+        ?>
+    </div>
+
+    <div id="filterSearchResult" style="margin-top:12px;"></div>
+</div>
+
+<script>
+    (function(){
+        const resultBox = document.getElementById('filterSearchResult');
+
+        function getSelectEl(){
+            return document.querySelector('select[name="analog_filter"]');
+        }
+
+        async function runSearch(){
+            const sel = getSelectEl();
+            if(!sel){ resultBox.innerHTML = '<div style="color:red">Не найден выпадающий список.</div>'; return; }
+            const val = sel.value.trim();
+            if(!val){ resultBox.innerHTML = '<div style="color:#666">Выберите фильтр…</div>'; return; }
+
+            resultBox.innerHTML = 'Загрузка…';
+
+            try{
+                const formData = new FormData();
+                formData.append('filter', val);
+
+                const resp = await fetch('search_filter_in_the_orders.php', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if(!resp.ok){
+                    resultBox.innerHTML = `<div style="color:red">Ошибка запроса: ${resp.status} ${resp.statusText}</div>`;
+                    return;
+                }
+
+                const html = await resp.text();
+                resultBox.innerHTML = html;
+            }catch(e){
+                resultBox.innerHTML = `<div style="color:red">Ошибка: ${e}</div>`;
+            }
+        }
+
+        const sel = getSelectEl();
+        if(sel){
+            sel.id = 'filterSelect'; // для label for
+            sel.addEventListener('change', runSearch);
+        }
+    })();
+</script>
 </body>
 </html>
