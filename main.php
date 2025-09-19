@@ -163,6 +163,10 @@ edit_access_button_draw();
             <input type="hidden" name="workshop" value="<?= htmlspecialchars($workshop) ?>">
             <input type="submit" value="План для сборщиц">
         </form>
+        <form action="buffer_stock.php" method="post" target="_blank">
+            <input type="hidden" name="workshop" value="<?= htmlspecialchars($workshop) ?>">
+            <input type="submit" value="Буфер гофропакетов">
+        </form>
     </div>
 
     <!-- Блок заявок -->
