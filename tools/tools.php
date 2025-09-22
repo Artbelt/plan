@@ -241,7 +241,7 @@ function load_filters_into_select($text){
     }
 
     /** Разбор массива значений  */
-    echo "<select name='analog_filter'>";
+    echo "<select name='analog_filter' >";
     echo "<option value=''>".$text."</option>";
     while ($orders_data = $result->fetch_assoc()){
         echo "<option value=".$orders_data['filter'].">".$orders_data['filter']."</option>";
