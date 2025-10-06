@@ -1,10 +1,71 @@
 <?php
-session_start();
-require_once('settings.php');
-require_once('tools/tools.php');
+// Проверяем авторизацию через новую систему
+require_once('../auth/includes/config.php');
+require_once('../auth/includes/auth-functions.php');
 
-$user      = $_SESSION['user']      ?? ($_GET['user_name'] ?? '');
-$workshop  = $_SESSION['workshop']  ?? ($_GET['workshop'] ?? '');
+// Подключаем настройки базы данных
+require_once('settings.php');
+
+// Инициализация системы авторизации
+initAuthSystem();
+
+// Запуск сессии
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+$auth = new AuthManager();
+$session = $auth->checkSession();
+
+if (!$session) {
+    header('Location: ../auth/login.php');
+    exit;
+}
+
+// Получаем информацию о пользователе
+$db = Database::getInstance();
+$users = $db->select("SELECT * FROM auth_users WHERE id = ?", [$session['user_id']]);
+$user = $users[0] ?? null;
+
+$userDepartments = $db->select("
+    SELECT ud.department_code, r.name as role_name, r.display_name as role_display_name
+    FROM auth_user_departments ud
+    JOIN auth_roles r ON ud.role_id = r.id
+    WHERE ud.user_id = ?
+", [$session['user_id']]);
+
+// Определяем текущий цех
+$currentDepartment = $_SESSION['auth_department'] ?? 'U2';
+
+// Проверяем, есть ли у пользователя доступ к цеху U2
+$hasAccessToU2 = false;
+$userRole = null;
+foreach ($userDepartments as $dept) {
+    if ($dept['department_code'] === 'U2') {
+        $hasAccessToU2 = true;
+        $userRole = $dept['role_name'];
+        break;
+    }
+}
+
+// Если нет доступа к U2, показываем предупреждение, но не блокируем
+if (!$hasAccessToU2) {
+    echo "<div style='background: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; margin: 10px; border-radius: 5px;'>";
+    echo "<h3>⚠️ Внимание: Нет доступа к цеху U2</h3>";
+    echo "<p>Ваши доступные цеха: ";
+    $deptNames = [];
+    foreach ($userDepartments as $dept) {
+        $deptNames[] = $dept['department_code'] . " (" . $dept['role_name'] . ")";
+    }
+    echo implode(", ", $deptNames);
+    echo "</p>";
+    echo "<p><a href='../index.php'>← Вернуться на главную страницу</a></p>";
+    echo "</div>";
+    
+    // Устанавливаем роль по умолчанию для отображения
+    $userRole = 'guest';
+}
+
 $advertisement = 'Информация';
 ?>
 <!doctype html>
@@ -462,10 +523,25 @@ $advertisement = 'Информация';
         <!-- Шапка -->
         <tr class="header-row">
             <td class="header-cell" colspan="3">
+                <!-- Аккуратная панель авторизации -->
+                <div style="position: fixed; top: 10px; right: 10px; background: white; padding: 12px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 1000; border: 1px solid #e5e7eb;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 14px;">
+                            <?= mb_substr($user['full_name'] ?? 'П', 0, 1, 'UTF-8') ?>
+                        </div>
+                        <div>
+                            <div style="font-weight: 600; font-size: 14px; color: #1f2937;"><?= htmlspecialchars($user['full_name'] ?? 'Пользователь') ?></div>
+                            <div style="font-size: 12px; color: #6b7280;"><?= htmlspecialchars($user['phone'] ?? '') ?></div>
+                            <div style="font-size: 11px; color: #9ca3af;"><?= $currentDepartment ?> • <?= ucfirst($userRole ?? 'guest') ?></div>
+                        </div>
+                        <a href="../auth/logout.php" style="padding: 6px 12px; background: #f3f4f6; color: #374151; text-decoration: none; border-radius: 4px; font-size: 12px; font-weight: 500; transition: background-color 0.2s;" onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='#f3f4f6'">Выход</a>
+                    </div>
+                </div>
+
                 <div class="headerbar">
-                    <div>Подразделение: <?php echo htmlspecialchars($workshop); ?></div>
+                    <div>Подразделение: <?php echo htmlspecialchars($currentDepartment); ?></div>
                     <div class="spacer"></div>
-                    <div>Пользователь: <?php echo htmlspecialchars($user); ?> · <a href="logout.php">выход из системы</a></div>
+                    <div><!-- Панель авторизации перенесена вверх --></div>
                 </div>
                 <?php if (function_exists('is_admin') && is_admin($user)) { if (function_exists('edit_access_button_draw')) { edit_access_button_draw(); } } ?>
             </td>
@@ -477,7 +553,7 @@ $advertisement = 'Информация';
             <td class="panel panel--left" style="width:22%;">
                 <div class="section-title">Операции</div>
                 <div class="stack">
-                    <a href="test.php" target="_blank" rel="noopener" class="stack"><button>Выпуск продукции</button></a>
+                    <a href="product_output.php" target="_blank" rel="noopener" class="stack"><button>Выпуск продукции</button></a>
                     <form action="product_output_view.php" method="post" class="stack"><input type="submit" value="Обзор выпуска продукции"></form>
                     <form action="parts_output_view.php" method="post"><input type="submit" value="Обзор изготовленных гофропакетов"></form>
                 </div>
@@ -485,42 +561,42 @@ $advertisement = 'Информация';
                 <div class="section-title" style="margin-top:14px;">Приложения</div>
                 <div class="stack">
                     <form action="add_filter_properties_into_db.php" method="post" target="_blank" class="stack">
-                        <input type="hidden" name="workshop" value="<?php echo htmlspecialchars($workshop); ?>" >
+                        <input type="hidden" name="workshop" value="<?php echo htmlspecialchars($currentDepartment); ?>" >
                         <input type="submit" value="Добавить / изменить фильтр">
                     </form>
                     <form action="manufactured_production_editor.php" method="post" target="_blank" class="stack">
-                        <input type="hidden" name="workshop" value="<?php echo htmlspecialchars($workshop); ?>">
+                        <input type="hidden" name="workshop" value="<?php echo htmlspecialchars($currentDepartment); ?>">
                         <input type="submit" value="Редактор внесенной продукции">
                     </form>
                     <form action="gofra_table.php" method="post" target="_blank" class="stack">
-                        <input type="hidden" name="workshop" value="<?php echo htmlspecialchars($workshop); ?>">
+                        <input type="hidden" name="workshop" value="<?php echo htmlspecialchars($currentDepartment); ?>">
                         <input type="submit" value="Журнал для гофропакетчиков">
                     </form>
                     <form action="gofra_packages_table.php" method="post" target="_blank" class="stack">
-                        <input type="hidden" name="workshop" value="<?php echo htmlspecialchars($workshop); ?>">
+                        <input type="hidden" name="workshop" value="<?php echo htmlspecialchars($currentDepartment); ?>">
                         <input type="submit" value="Кол-во гофропакетов из рулона">
                     </form>
 
                     <div style="border-top:1px solid var(--border); margin:6px 0;"></div>
 
                     <form action="NP_monitor.php" method="post" target="_blank" class="stack">
-                        <input type="hidden" name="workshop" value="<?php echo htmlspecialchars($workshop); ?>">
+                        <input type="hidden" name="workshop" value="<?php echo htmlspecialchars($currentDepartment); ?>">
                         <input type="submit" value="Мониторинг">
                     </form>
                     <form action="worker_modules/tasks_corrugation.php" method="post" target="_blank" class="stack">
-                        <input type="hidden" name="workshop" value="<?php echo htmlspecialchars($workshop); ?>">
+                        <input type="hidden" name="workshop" value="<?php echo htmlspecialchars($currentDepartment); ?>">
                         <input type="submit" value="Модуль оператора ГМ">
                     </form>
                     <form action="worker_modules/tasks_cut.php" method="post" target="_blank" class="stack">
-                        <input type="hidden" name="workshop" value="<?php echo htmlspecialchars($workshop); ?>">
+                        <input type="hidden" name="workshop" value="<?php echo htmlspecialchars($currentDepartment); ?>">
                         <input type="submit" value="Модуль оператора бумагорезки">
                     </form>
                     <form action="worker_modules/tasks_for_builders.php" method="post" target="_blank" class="stack">
-                        <input type="hidden" name="workshop" value="<?php echo htmlspecialchars($workshop); ?>">
+                        <input type="hidden" name="workshop" value="<?php echo htmlspecialchars($currentDepartment); ?>">
                         <input type="submit" value="План для сборщиц">
                     </form>
                     <form action="buffer_stock.php" method="post" target="_blank" class="stack">
-                        <input type="hidden" name="workshop" value="<?php echo htmlspecialchars($workshop); ?>">
+                        <input type="hidden" name="workshop" value="<?php echo htmlspecialchars($currentDepartment); ?>">
                         <input type="submit" value="Буфер гофропакетов">
                     </form>
                     <div class="search-card">
@@ -615,7 +691,7 @@ $advertisement = 'Информация';
                             echo '<form action="show_order.php" method="post" target="_blank">';
                             if ($result->num_rows === 0) { echo "<div class='muted'>В базе нет ни одной заявки</div>"; }
                             while ($orders_data = $result->fetch_assoc()){
-                                if (($workshop === $orders_data['workshop']) && ($orders_data['hide'] != 1)){
+                                if (($currentDepartment === $orders_data['workshop']) && ($orders_data['hide'] != 1)){
                                     $val = htmlspecialchars($orders_data['order_number']);
                                     echo "<input type='submit' name='order_number' value='{$val}'>";
                                 }
