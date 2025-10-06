@@ -117,10 +117,12 @@ function is_admin($user){
 
 /** Функция рисует кнопку предоставления доступа для редактирования */
 function edit_access_button_draw(){
-    //echo '<button>Дать доступ для редактирования</button>';
+    // Обертка с классом для управления внешними отступами на странице
+    echo '<div class="edit-access-wrap">';
     echo '<form action="edit_access_processing.php" target="_blank" method="post">';
-    echo '<input type = "submit" value="Дать доступ для редактрования"/>';
+    echo '<input type="submit" value="Дать доступ для редактирования"/>';
     echo '</form>';
+    echo '</div>';
 
 }
 

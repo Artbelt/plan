@@ -4,6 +4,27 @@
     <meta charset="UTF-8">
     <title>Заявка</title>
     <style>
+        /* ===== Modern UI palette (to match main.php) ===== */
+        :root{
+            --bg:#f6f7f9;
+            --panel:#ffffff;
+            --ink:#1e293b;
+            --muted:#64748b;
+            --border:#e2e8f0;
+            --accent:#667eea;
+            --radius:14px;
+            --shadow:0 10px 25px rgba(0,0,0,0.08), 0 4px 8px rgba(0,0,0,0.06);
+            --shadow-soft:0 2px 8px rgba(0,0,0,0.08);
+        }
+        html,body{height:100%}
+        body{
+            margin:0; background:var(--bg); color:var(--ink);
+            font: 16px/1.6 "Inter","Segoe UI", Arial, sans-serif;
+            -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+        }
+
+        .container{ max-width:1200px; margin:0 auto; padding:16px; }
+
         /* Tooltip */
         .tooltip {
             position: relative;
@@ -37,19 +58,19 @@
         #loading {
             position: fixed;
             top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(255, 255, 255, 0.8);
+            background: rgba(15,23,42,0.25);
             z-index: 1000;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             font-size: 24px;
-            color: #333;
+            color: #fff;
             font-weight: bold;
         }
         .spinner {
-            border: 8px solid #f3f3f3;
-            border-top: 8px solid #3498db;
+            border: 8px solid rgba(255,255,255,0.3);
+            border-top: 8px solid #fff;
             border-radius: 50%;
             width: 80px;
             height: 80px;
@@ -62,20 +83,50 @@
         }
         .loading-text {
             font-size: 20px;
-            color: #333;
+            color: #fff;
         }
 
         /* Таблица */
         table {
-            border: 1px solid black;
+            width: 100%;
             border-collapse: collapse;
             font-size: 14px;
-            margin-top: 20px;
+            margin-top: 16px;
+            background: var(--panel);
+            border:1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-soft);
+            overflow: hidden;
         }
         th, td {
-            border: 1px solid black;
-            padding: 5px 10px;
+            border-bottom: 1px solid var(--border);
+            padding: 10px 12px;
             text-align: center;
+            color: var(--ink);
+        }
+        tr:last-child td{ border-bottom: 0; }
+        thead th{
+            background:#f8fafc;
+            font-weight:600;
+        }
+        h3{ margin:0; font-size:18px; font-weight:700; }
+
+        /* Buttons */
+        input[type='submit'], .btn{
+            appearance:none; cursor:pointer; border:none; color:#fff;
+            background: linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+            padding: 10px 16px; border-radius: 10px; font-weight:600; box-shadow: var(--shadow-soft);
+            transition: transform .15s ease, box-shadow .2s ease, filter .2s ease;
+        }
+        input[type='submit']:hover, .btn:hover{ transform: translateY(-1px); box-shadow: var(--shadow); filter: brightness(1.05); }
+        input[type='submit']:active, .btn:active{ transform: translateY(0); }
+
+        /* Responsive table */
+        .table-wrap{ overflow:auto; border-radius: var(--radius); box-shadow: var(--shadow); }
+        @media (max-width: 900px){
+            .container{ padding:16px; }
+            table{ font-size:13px; }
+            th, td{ padding: 8px 10px; }
         }
     </style>
 </head>
@@ -87,6 +138,7 @@
     <div class="loading-text">Загрузка...</div>
 </div>
 
+<div class="container">
 <?php
 require('tools/tools.php');
 require('settings.php');
@@ -166,6 +218,7 @@ $corr_fact_summ = 0;          // суммарно изготовлено гоф�
 
 // Отрисовка таблицы
 echo "<h3>Заявка: ".htmlspecialchars($order_number)."</h3>";
+echo "<div class='table-wrap'>";
 echo "<table id='order_table'>";
 echo "<tr>
         <th>№п/п</th>
@@ -238,19 +291,17 @@ echo "<tr>
       </tr>";
 
 echo "</table>";
+echo "</div>";
 echo "<p>* - без учета перевыполнения</p>";
 ?>
 
 <br>
-<form action='order_planning_U2.php' method='post'>
-    <input type='hidden' name='order_number' value='<?= htmlspecialchars($order_number) ?>'>
-    <input type='submit' value='Режим простого планирования'>
-</form>
-
 <form action='hiding_order.php' method='post' style="margin-top: 10px;">
     <input type='hidden' name='order_number' value='<?= htmlspecialchars($order_number) ?>'>
     <input type='submit' value='Отправить заявку в архив'>
 </form>
+
+</div>
 
 <script>
     window.addEventListener('load', function () {
