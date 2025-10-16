@@ -534,6 +534,7 @@ $advertisement = 'Информация';
                             <div style="font-size: 12px; color: #6b7280;"><?= htmlspecialchars($user['phone'] ?? '') ?></div>
                             <div style="font-size: 11px; color: #9ca3af;"><?= $currentDepartment ?> • <?= ucfirst($userRole ?? 'guest') ?></div>
                         </div>
+                        <a href="../auth/change-password.php" style="padding: 4px 8px; background: transparent; color: #9ca3af; text-decoration: none; border-radius: 3px; font-size: 11px; font-weight: 400; transition: all 0.2s; border: 1px solid #e5e7eb;" onmouseover="this.style.background='#f9fafb'; this.style.color='#6b7280'; this.style.borderColor='#d1d5db'" onmouseout="this.style.background='transparent'; this.style.color='#9ca3af'; this.style.borderColor='#e5e7eb'">Пароль</a>
                         <a href="../auth/logout.php" style="padding: 6px 12px; background: #f3f4f6; color: #374151; text-decoration: none; border-radius: 4px; font-size: 12px; font-weight: 500; transition: background-color 0.2s;" onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='#f3f4f6'">Выход</a>
                     </div>
                 </div>
@@ -543,7 +544,7 @@ $advertisement = 'Информация';
                     <div class="spacer"></div>
                     <div><!-- Панель авторизации перенесена вверх --></div>
                 </div>
-                <?php if (function_exists('is_admin') && is_admin($user)) { if (function_exists('edit_access_button_draw')) { edit_access_button_draw(); } } ?>
+                <?php if (function_exists('edit_access_button_draw')) { edit_access_button_draw(); } ?>
             </td>
         </tr>
 
@@ -690,12 +691,53 @@ $advertisement = 'Информация';
                         if ($result = $mysqli->query($sql)) {
                             echo '<form action="show_order.php" method="post" target="_blank">';
                             if ($result->num_rows === 0) { echo "<div class='muted'>В базе нет ни одной заявки</div>"; }
+                            
+                            // Группируем заявки для отображения
+                            $orders_list = [];
                             while ($orders_data = $result->fetch_assoc()){
                                 if (($currentDepartment === $orders_data['workshop']) && ($orders_data['hide'] != 1)){
-                                    $val = htmlspecialchars($orders_data['order_number']);
-                                    echo "<input type='submit' name='order_number' value='{$val}'>";
+                                    $order_num = $orders_data['order_number'];
+                                    if (!isset($orders_list[$order_num])) {
+                                        $orders_list[$order_num] = $orders_data;
+                                    }
                                 }
                             }
+                            
+                            // Выводим уникальные заявки с прогрессом
+                            foreach ($orders_list as $order_num => $orders_data){
+                                // Расчет прогресса для заявки
+                                $total_planned = 0;
+                                $total_produced = 0;
+                                
+                                // Получаем общее количество по заявке
+                                $sql_total = "SELECT SUM(count) as total FROM orders WHERE order_number = '$order_num'";
+                                if ($res_total = $mysqli->query($sql_total)) {
+                                    if ($row_total = $res_total->fetch_assoc()) {
+                                        $total_planned = (int)$row_total['total'];
+                                    }
+                                }
+                                
+                                // Получаем произведенное количество
+                                $sql_produced = "SELECT SUM(count_of_filters) as produced FROM manufactured_production WHERE name_of_order = '$order_num'";
+                                if ($res_produced = $mysqli->query($sql_produced)) {
+                                    if ($row_produced = $res_produced->fetch_assoc()) {
+                                        $total_produced = (int)$row_produced['produced'];
+                                    }
+                                }
+                                
+                                // Вычисляем процент
+                                $progress = 0;
+                                if ($total_planned > 0) {
+                                    $progress = round(($total_produced / $total_planned) * 100);
+                                }
+                                
+                                // Формируем кнопку с меньшим шрифтом для процента
+                                echo "<button type='submit' name='order_number' value='{$order_num}' style='height: 35px; width: 215px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; padding: 0 12px; margin-bottom: 8px;' title='Прогресс выполнения: {$progress}%'>";
+                                echo "<span style='font-size: 13px; flex: 1; text-align: center;'>{$order_num}</span>";
+                                echo "<span style='font-size: 10px; opacity: 0.8; margin-left: 8px;'>[{$progress}%]</span>";
+                                echo "</button>";
+                            }
+                            
                             echo '</form>';
                             $result->close();
                         } else {

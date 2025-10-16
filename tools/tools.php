@@ -105,10 +105,28 @@ function print_r_my ($a){
 
 /** Проверяет является ли пользователь администратором */
 function is_admin($user){
+    // Если $user - это массив (новая система авторизации)
+    if (is_array($user)) {
+        // Проверяем роль пользователя в новой системе
+        if (isset($user['role']) && in_array($user['role'], ['admin', 'director'])) {
+            return true;
+        }
+        
+        // Если нет информации о роли, проверяем в старой таблице по имени пользователя
+        if (isset($user['full_name'])) {
+            $sql = "SELECT * FROM users WHERE user = '".$user['full_name']."'";
+            $result = mysql_execute($sql);
+            $status = mysqli_fetch_assoc($result);
+            return ($status && $status['Admin'] == 1);
+        }
+        return false;
+    }
+    
+    // Если $user - это строка (старая система)
     $sql = "SELECT * FROM users WHERE user = '".$user."'";
     $result = mysql_execute($sql);
     $status = mysqli_fetch_assoc($result);
-    if ($status['Admin'] == 1){
+    if ($status && $status['Admin'] == 1){
         return true;
     } else {
         return false;
