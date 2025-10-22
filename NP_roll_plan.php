@@ -76,6 +76,17 @@ if (in_array($action, ['load_assignments','save_assignments'], true)) {
                     $ins->execute([$order, $dd->format('Y-m-d'), $b]);
                 }
             }
+
+            // Обновляем статус plan_ready = 1 в таблице orders
+            try {
+                $pdo->prepare("UPDATE orders SET plan_ready = 1 WHERE order_number = ?")->execute([$order]);
+            } catch(Throwable $e) {
+                // Если поле plan_ready не существует, просто игнорируем ошибку
+                if (strpos($e->getMessage(), 'plan_ready') === false) {
+                    throw $e;
+                }
+            }
+
             $pdo->commit();
             echo json_encode(['ok'=>true]); exit;
         }
@@ -104,13 +115,41 @@ try{
 
 $order = $_GET['order'] ?? '';
 
-$stmt = $pdo->prepare("SELECT * FROM cut_plans WHERE order_number = ?");
+// Получаем статус заказа для проверки plan_ready
+$plan_ready = false;
+if ($order) {
+    try {
+        $status_stmt = $pdo->prepare("SELECT plan_ready FROM orders WHERE order_number = ? LIMIT 1");
+        $status_stmt->execute([$order]);
+        $order_status = $status_stmt->fetch();
+        $plan_ready = $order_status ? (bool)$order_status['plan_ready'] : false;
+    } catch(Throwable $e) {
+        // Если поле plan_ready не существует, просто игнорируем ошибку
+        if (strpos($e->getMessage(), 'plan_ready') === false) {
+            throw $e;
+        }
+    }
+}
+
+$stmt = $pdo->prepare("SELECT bale_id, filter, height, width, format FROM cut_plans WHERE order_number = ? ORDER BY bale_id");
 $stmt->execute([$order]);
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $bales = [];
 foreach ($rows as $r) {
-    $bales[$r['bale_id']][] = $r;   // одна строка = один «рулон» в бухте
+    $bid = (int)$r['bale_id'];
+    if (!isset($bales[$bid])) {
+        $bales[$bid] = [
+            'bale_id' => $bid, 
+            'strips' => [],
+            'format' => $r['format'] ?? '1000' // Формат бухты
+        ];
+    }
+    $bales[$bid]['strips'][] = [
+        'filter' => $r['filter'],
+        'height' => (float)$r['height'],
+        'width'  => (float)$r['width'],
+    ];
 }
 ?>
 <!DOCTYPE html>
@@ -141,6 +180,12 @@ foreach ($rows as $r) {
             font-size:14px; cursor:pointer; transition:.15s ease; font-weight:600;
         }
         .btn:hover{ background:#1557b0; border-color:#1557b0; }
+        .btn-complete{
+            background:#16a34a; color:#fff; border:1px solid #16a34a; border-radius:10px; padding:8px 14px;
+            font-size:14px; cursor:pointer; transition:.15s ease; font-weight:600;
+            margin-top: 10px;
+        }
+        .btn-complete:hover{ background:#15803d; border-color:#15803d; }
 
         #planArea{
             position:relative; overflow-x:auto; overflow-y:auto; margin-top:14px;
@@ -179,6 +224,24 @@ foreach ($rows as $r) {
         .highlight{ background:#d1ecf1 !important; border-color:#0bb !important; }
         .overload{ background:#fde2e2 !important; }
 
+        /* Панель висот (чіпи) */
+        #heightBarWrap{margin-top:12px;background:#fff;border:1px solid #e5e7eb;border-radius:10px;box-shadow:0 1px 6px rgba(0,0,0,.05);padding:8px 10px;}
+        #heightBarTitle{font-size:12px;color:#555;margin:0 0 6px}
+        #heightBar{display:flex;flex-wrap:wrap;gap:6px}
+        .hchip{font-size:12px;line-height:1;border:1px solid #d1d5db;border-radius:999px;padding:6px 10px;background:#f9fafb;cursor:pointer;user-select:none;position:relative;padding-bottom:16px}
+        .hchip.active{background:#e0f2fe;border-color:#38bdf8;font-weight:600}
+        /* відсоток + смужка прогресу всередині чіпа */
+        .hchip .hpct{font-size:10px;color:#555;margin-left:6px}
+        .hchip .hbar{position:absolute;left:8px;right:8px;bottom:4px;height:4px;background:#e5e7eb;border-radius:999px;overflow:hidden}
+        .hchip .hfill{height:100%;width:0;background:#60a5fa;transition:width .2s ease}
+
+        /* тільки окремі висоти */
+        .hval{padding:1px 4px;border-radius:4px;margin-right:2px;border:1px solid transparent}
+        .hval.active{background:#7dd3fc;color:#052c47;font-weight:700;border-color:#0284c7;box-shadow:0 0 0 2px rgba(2,132,199,.22)}
+
+        /* ВЫДЕЛЕНИЕ названия запланированных бухт */
+        .bale-name.bale-picked{background:#fff7cc !important;color:#e65100 !important;padding:2px 6px;border-radius:4px;border:1px solid #f59e0b}
+
         .hscroll{ margin-top:10px; height:18px; border:1px solid #e5e7eb; background:#fff; border-radius:8px; overflow-x:auto; overflow-y:hidden; box-shadow:0 1px 4px rgba(0,0,0,.04); }
         .hscroll-inner{ height:1px; }
 
@@ -192,7 +255,7 @@ foreach ($rows as $r) {
 <body>
 <div class="container">
     <h2>Планирование раскроя для заявки <?= htmlspecialchars($order) ?></h2>
-    <p><b>Норматив:</b> 1 бухта = <b>40 минут</b> = 0.67 ч</p>
+    <p><b>Норматив:</b> 1 бухта формата 1000 = <b>40 минут</b> (0.67 ч), формата 199 = <b>30 минут</b> (0.5 ч)</p>
 
     <form onsubmit="event.preventDefault(); drawTable();">
         <label>Дата начала: <input type="date" id="startDate" required></label>
@@ -201,6 +264,22 @@ foreach ($rows as $r) {
         <button type="button" class="btn" id="btnLoad">Загрузить сохранённый</button>
         <button type="button" class="btn" id="btnSave">Сохранить план</button>
     </form>
+
+    <?php if ($plan_ready): ?>
+        <div style="text-align: center; margin-top: 15px;">
+            <button type="button" class="btn-complete" onclick="window.location.href='NP_cut_index.php'">
+                ✅ Завершить планирование
+            </button>
+            <p style="font-size: 12px; color: #666; margin-top: 5px;">
+                План сохранён. Переход к планированию гофрирования.
+            </p>
+        </div>
+    <?php endif; ?>
+
+    <div id="heightBarWrap" style="display:none">
+        <div id="heightBarTitle">Фільтр за висотами:</div>
+        <div id="heightBar"></div>
+    </div>
 
     <div id="planArea"></div>
 
@@ -212,7 +291,7 @@ foreach ($rows as $r) {
 
 <script>
     const ORDER  = <?= json_encode($order) ?>;
-    const BALES  = <?= json_encode($bales, JSON_UNESCAPED_UNICODE) ?>;
+    const BALES  = <?= json_encode(array_values($bales), JSON_UNESCAPED_UNICODE) ?>;
 
     let selected = {}; // { "YYYY-MM-DD": ["baleId1","baleId2", ...] }
 
@@ -223,6 +302,118 @@ foreach ($rows as $r) {
         a.setHours(12); b.setHours(12);
         return Math.round((b - a) / 86400000);
     };
+
+    // утиліта для id з висотою (14.5 -> "14_5")
+    const hid = h => String(h).replace(/\./g, '_');
+
+    // Множина обраних висот у фільтрі
+    const selectedHeights = new Set();
+
+    // Всі доступні висоти
+    const allHeights = (() => {
+        const s = new Set();
+        BALES.forEach(b => b.strips.forEach(st => s.add(Number(st.height))));
+        return Array.from(s).sort((a,b)=>a-b);
+    })();
+
+    // Загальна кількість смуг по кожній висоті у всьому замовленні
+    const totalStripsByHeight = (() => {
+        const m = new Map();
+        BALES.forEach(b => b.strips.forEach(s => {
+            const h = Number(s.height);
+            m.set(h, (m.get(h) || 0) + 1);
+        }));
+        return m; // Map<height, totalCount>
+    })();
+
+    function buildHeightBar(){
+        const wrap = document.getElementById('heightBarWrap');
+        const bar  = document.getElementById('heightBar');
+        if(!allHeights.length){ wrap.style.display='none'; return; }
+        wrap.style.display='';
+        bar.innerHTML='';
+
+        // Скинути
+        const reset = document.createElement('span');
+        reset.className='hchip';
+        reset.textContent='Скинути';
+        reset.title='Очистити вибір висот';
+        reset.onclick=()=>{
+            selectedHeights.clear();
+            bar.querySelectorAll('.hchip').forEach(c=>c.classList.remove('active'));
+            updateHeightHighlights();
+        };
+        bar.appendChild(reset);
+
+        // Чіпи висот з % та прогрес-баром
+        allHeights.forEach(h=>{
+            const id = hid(h);
+            const chip = document.createElement('span');
+            chip.className='hchip';
+            chip.dataset.h = h;
+            chip.innerHTML = `[${h}] <span class="hpct" id="hpct-${id}">0%</span>
+                               <span class="hbar"><span class="hfill" id="hfill-${id}"></span></span>`;
+            chip.onclick=()=>{
+                const val = Number(chip.dataset.h);
+                if(selectedHeights.has(val)){ selectedHeights.delete(val); chip.classList.remove('active'); }
+                else{ selectedHeights.add(val); chip.classList.add('active'); }
+                updateHeightHighlights();
+            };
+            bar.appendChild(chip);
+        });
+        updateHeightProgress();
+    }
+
+    function updateHeightHighlights(){
+        document.querySelectorAll('.hval').forEach(span=>{
+            const h = Number(span.dataset.h);
+            if(selectedHeights.has(h)) span.classList.add('active'); else span.classList.remove('active');
+        });
+    }
+
+    function getSelectedBaleIds(){
+        const set = new Set();
+        Object.values(selected).forEach(arr => (arr||[]).forEach(id => set.add(id)));
+        return set;
+    }
+
+    function updateLeftMarkers(){
+        const chosen = getSelectedBaleIds();
+        document.querySelectorAll('.bale-name').forEach(el=>{
+            const bid = el.dataset.baleId; // оставляем как строку
+            el.classList.toggle('bale-picked', chosen.has(bid));
+        });
+    }
+
+    // Порахувати прогрес по кожній висоті і намалювати у чіпах
+    function updateHeightProgress(){
+        const planned = new Map(); // Map<height, count>
+        Object.values(selected).forEach(arr=>{
+            (arr||[]).forEach(bid=>{
+                const b = BALES.find(x=>x.bale_id===bid);
+                if(!b) return;
+                b.strips.forEach(s=>{
+                    const h = Number(s.height);
+                    planned.set(h, (planned.get(h)||0)+1);
+                });
+            });
+        });
+
+        allHeights.forEach(h=>{
+            const id = hid(h);
+            const total = totalStripsByHeight.get(h) || 0;
+            const done  = planned.get(h) || 0;
+            const pct   = total ? Math.round(done*100/total) : 0;
+
+            const pctEl  = document.getElementById(`hpct-${id}`);
+            const fillEl = document.getElementById(`hfill-${id}`);
+            if (pctEl)  pctEl.textContent = `${pct}%`;
+            if (fillEl) fillEl.style.width = `${pct}%`;
+
+            const chip = document.querySelector(`.hchip[data-h="${h}"]`);
+            if (chip) chip.title = `Розплановано: ${done} з ${total} (${pct}%)`;
+        });
+    }
 
     async function drawTable() {
         const startVal = document.getElementById('startDate').value;
@@ -253,21 +444,28 @@ foreach ($rows as $r) {
         /* --- TBODY --- */
         const tbody = document.createElement('tbody');
 
-        Object.entries(BALES).forEach(([baleId, rolls])=>{
+        BALES.forEach(b => {
             const tr = document.createElement('tr');
 
-            const heights = rolls.map(r => `[${r.height}]`).join(' ');
-            const tooltip = rolls.map(r => `${r.filter} [${r.height}] ${r.width}`).join('\n');
+            const uniqHeights = Array.from(new Set(b.strips.map(s=>Number(s.height))).values());
+            const tooltip = b.strips
+                .map(s => `${s.filter} [${s.height}] ${s.width}мм`)
+                .join('\n');
 
             const td0 = document.createElement('td');
-            td0.innerHTML = `<strong>Бухта ${baleId}</strong><div class="bale-label">${heights}</div>`;
+            td0.className = 'left-label';
+            td0.dataset.baleId = b.bale_id;
+            const formatLabel = b.format ? `[${b.format}]` : '[1000]';
+            td0.innerHTML = `<strong class="bale-name" data-bale-id="${b.bale_id}">Бухта ${b.bale_id} ${formatLabel}</strong><div class="bale-label">`
+                + uniqHeights.map(h=>`<span class="hval" data-h="${h}">[${h}]</span>`).join(' ')
+                + '</div>';
             td0.title = tooltip;
             tr.appendChild(td0);
 
             dates.forEach(iso=>{
                 const td = document.createElement('td');
                 td.dataset.date   = iso;
-                td.dataset.baleId = baleId;
+                td.dataset.baleId = b.bale_id;
 
                 td.onclick = ()=>{
                     const sid = td.dataset.date;
@@ -291,6 +489,8 @@ foreach ($rows as $r) {
                         td.classList.add('highlight');
                     }
                     updateTotals();
+                    updateHeightProgress();
+                    updateLeftMarkers();
                 };
 
                 tr.appendChild(td);
@@ -317,6 +517,11 @@ foreach ($rows as $r) {
 
         // Нижний бегунок
         setupBottomScrollbar(container, table);
+
+        updateTotals();
+        updateHeightHighlights();
+        updateHeightProgress();
+        updateLeftMarkers();
 
         // Автоподгрузка сохранённого плана для текущих параметров
         try{
@@ -347,17 +552,29 @@ foreach ($rows as $r) {
     }
 
     function updateTotals() {
-        const minsPerBale = 40;
+        const minsPerBale1000 = 40;  // Формат 1000: 40 минут = 0.67 часа
+        const minsPerBale199 = 30;   // Формат 199: 30 минут = 0.5 часа
+        
         const all = document.querySelectorAll('td.highlight');
         const cnt = {};
+        
         all.forEach(td=>{
             const d = td.dataset.date;
-            cnt[d] = (cnt[d]||0) + 1;
+            const baleId = td.dataset.baleId;
+            
+            // Находим бухту по ID и получаем её формат
+            const bale = BALES.find(b => String(b.bale_id) === String(baleId));
+            const format = bale ? (bale.format || '1000') : '1000';
+            const mins = (format === '199') ? minsPerBale199 : minsPerBale1000;
+            
+            if (!cnt[d]) cnt[d] = { total_mins: 0, count: 0 };
+            cnt[d].total_mins += mins;
+            cnt[d].count += 1;
         });
 
         document.querySelectorAll('[id^="load-"]').forEach(td=>{
             const date = td.id.replace('load-','');
-            const hours = ((cnt[date]||0) * minsPerBale) / 60;
+            const hours = cnt[date] ? (cnt[date].total_mins / 60) : 0;
             td.textContent = (hours>0) ? hours.toFixed(2) : '';
             td.className = (hours > 7) ? 'overload' : '';
         });
@@ -373,9 +590,33 @@ foreach ($rows as $r) {
             const data = await res.json();
             if (!data.ok) throw new Error(data.error || 'save failed');
             alert('План сохранён');
+            
+            // Показываем кнопку "Завершить" после сохранения
+            showCompleteButton();
         }catch(e){
             alert('Ошибка сохранения: ' + e.message);
         }
+    }
+
+    function showCompleteButton(){
+        // Проверяем, не добавлена ли уже кнопка
+        if (document.getElementById('completeButton')) return;
+        
+        const completeDiv = document.createElement('div');
+        completeDiv.id = 'completeButton';
+        completeDiv.style.cssText = 'text-align: center; margin-top: 15px;';
+        completeDiv.innerHTML = `
+            <button type="button" class="btn-complete" onclick="window.location.href='NP_cut_index.php'">
+                ✅ Завершить планирование
+            </button>
+            <p style="font-size: 12px; color: #666; margin-top: 5px;">
+                План сохранён. Переход к планированию гофрирования.
+            </p>
+        `;
+        
+        // Вставляем кнопку после формы
+        const form = document.querySelector('form');
+        form.parentNode.insertBefore(completeDiv, form.nextSibling);
     }
 
     async function loadSavedPlan(){
@@ -409,6 +650,9 @@ foreach ($rows as $r) {
             td.classList.add('highlight');
         }
         updateTotals();
+        updateHeightHighlights();
+        updateHeightProgress();
+        updateLeftMarkers();
     }
 
     // Кнопки в форме
@@ -438,11 +682,12 @@ foreach ($rows as $r) {
         }
     });
 
-    // стартовая дата = сегодня
+    // стартовая дата = сегодня и инициализация фильтра высот
     (function setToday(){
         const el = document.getElementById('startDate');
         const today = new Date(); today.setHours(12);
         el.value = today.toISOString().slice(0,10);
+        buildHeightBar();
     })();
 </script>
 </body>

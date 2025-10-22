@@ -95,6 +95,8 @@ $form_factors = $pdo->query("SELECT id, name FROM form_factors ORDER BY id")->fe
 <?php
 if (isset($_POST['filter_name'])){
     $filter_name = $_POST['filter_name'];
+} else if (isset($_GET['filter_name'])) {
+    $filter_name = $_GET['filter_name'];
 } else {
     $filter_name = '';
 }
@@ -103,6 +105,26 @@ if (isset($_POST['analog_filter']) AND ($_POST['analog_filter'] != '')){
     $analog_filter = $_POST['analog_filter'];
     echo "<p style='text-align: center'>ANALOG_FILTER = " . $analog_filter . "</p>";
     $analog_data = get_filter_data($analog_filter);
+} else if (isset($_GET['analog_filter']) AND ($_GET['analog_filter'] != '')) {
+    // Если передан параметр analog_filter через GET, используем его
+    $analog_filter = $_GET['analog_filter'];
+    echo "<p style='text-align: center'>ANALOG_FILTER = " . $analog_filter . "</p>";
+    $analog_data = get_filter_data($analog_filter);
+} else if (isset($_GET['filter_name']) && (!isset($_GET['analog_filter']) || $_GET['analog_filter'] == '')) {
+    // Если передан только filter_name через GET, но без analog_filter или с пустым analog_filter
+    $analog_filter = '';
+    $analog_data = array(
+        'paper_package_length' => '',
+        'paper_package_width' => '',
+        'paper_package_height' => '',
+        'paper_package_pleats_count' => '',
+        'paper_package_amplifier' => '',
+        'paper_package_supplier' => '',
+        'paper_package_name' => '',
+        'g_box' => '',
+        'box' => '',
+        'comment' => ''
+    );
 } else {
     $analog_filter = '';
     echo "<p style='text-align: center';>Аналог не определен</p>";
@@ -137,7 +159,7 @@ if (isset($_POST['analog_filter']) AND ($_POST['analog_filter'] != '')){
 <form action="processing_add_panel_filter_into_db.php" method="post">
     <div class="field-group">
         <label>Наименование фильтра</label>
-        <input type="text" name="filter_name" size="40" value="<?php echo $analog_filter?>">
+        <input type="text" name="filter_name" size="40" value="<?php echo htmlspecialchars($filter_name ?: $analog_filter)?>">
     </div>
     <div class="field-group">
         <label>Категория</label>
@@ -255,6 +277,9 @@ if (isset($_POST['analog_filter']) AND ($_POST['analog_filter'] != '')){
     <hr>
     <div id="change-log"><b>Изменения:</b></div>
     <input type="hidden" name="changes_log" id="changes_log">
+    <?php if (!empty($analog_filter)): ?>
+        <input type="hidden" name="analog_filter" value="<?php echo htmlspecialchars($analog_filter) ?>">
+    <?php endif; ?>
 
     <input type="submit" value="Сохранить фильтр">
 </form>

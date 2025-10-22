@@ -5,6 +5,7 @@ require_once('../auth/includes/auth-functions.php');
 
 // Подключаем настройки базы данных
 require_once('settings.php');
+require_once('tools/tools.php');
 
 // Инициализация системы авторизации
 initAuthSystem();
@@ -65,6 +66,22 @@ if (!$hasAccessToU2) {
     // Устанавливаем роль по умолчанию для отображения
     $userRole = 'guest';
 }
+
+// Функция проверки доступа к заявкам на лазер
+function canAccessLaserRequests($userDepartments, $currentDepartment) {
+    // Проверяем доступ для текущего цеха
+    foreach ($userDepartments as $dept) {
+        if ($dept['department_code'] === $currentDepartment) {
+            $role = $dept['role_name'];
+            // Доступ имеют: сборщики, мастера, директора (но не менеджеры)
+            return in_array($role, ['assembler', 'master', 'director']);
+        }
+    }
+    return false;
+}
+
+// Для main.php всегда проверяем доступ к цеху U2
+$canAccessLaser = canAccessLaserRequests($userDepartments, 'U2');
 
 $advertisement = 'Информация';
 ?>
@@ -556,7 +573,10 @@ $advertisement = 'Информация';
                 <div class="stack">
                     <a href="product_output.php" target="_blank" rel="noopener" class="stack"><button>Выпуск продукции</button></a>
                     <form action="product_output_view.php" method="post" class="stack"><input type="submit" value="Обзор выпуска продукции"></form>
-                    <form action="parts_output_view.php" method="post"><input type="submit" value="Обзор изготовленных гофропакетов"></form>
+                    <form action="parts_output_view.php" method="post" class="stack"><input type="submit" value="Обзор изготовленных гофропакетов"></form>
+                    <?php if ($canAccessLaser): ?>
+                    <a href="laser_request.php" target="_blank" rel="noopener" class="stack"><button>Заявка на лазер</button></a>
+                    <?php endif; ?>
                 </div>
 
                 <div class="section-title" style="margin-top:14px;">Приложения</div>
@@ -750,6 +770,7 @@ $advertisement = 'Информация';
 
                 <div class="section-title" style="margin-top:14px;">Управление заявками</div>
                 <section class="stack">
+                    <form action="new_order.php" method="post" target="_blank"  class="stack"><input type="submit" value="Создать заявку вручную"></form>
                     <form action="archived_orders.php" target="_blank"  class="stack"><input type="submit" value="Архив заявок"></form>
                     <form action="NP_cut_index.php" method="post" target="_blank"  class="stack"><input type="submit" value="Менеджер планирования"></form>
                     <form action="NP_supply_requirements.php" method="post" target="_blank"  class="stack"><input type="submit" value="Потребность в комплектации"></form>

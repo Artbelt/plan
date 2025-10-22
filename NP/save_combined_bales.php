@@ -20,9 +20,24 @@ $max_id = intval($pdo->query("SELECT MAX(bale_id) FROM cut_plans")->fetchColumn(
 // Сохраняем авто-бухты
 foreach ($auto_bales as $bale) {
     $max_id++;
+    
+    // Определяем формат для всей бухты - проверяем ВСЕ рулоны
+    $bale_format = '199'; // Предполагаем что это формат 199
     foreach ($bale as $roll) {
-        $stmt = $pdo->prepare("INSERT INTO cut_plans (order_number, manual, filter, paper, width, height, length, waste, bale_id)
-            VALUES (?, 0, ?, ?, ?, ?, ?, ?, ?)");
+        if (isset($roll['width'])) {
+            $width = (float)$roll['width'];
+            // Если хотя бы один рулон НЕ формата 199, то вся бухта формата 1000
+            if (!($width == 199 || ($width >= 175 && $width <= 190))) {
+                $bale_format = '1000';
+                break;
+            }
+        }
+    }
+    
+    // Сохраняем все рулоны бухты с одним форматом
+    foreach ($bale as $roll) {
+        $stmt = $pdo->prepare("INSERT INTO cut_plans (order_number, manual, filter, paper, width, height, length, format, waste, bale_id)
+            VALUES (?, 0, ?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([
             $order,
             $roll['filter'],
@@ -30,6 +45,7 @@ foreach ($auto_bales as $bale) {
             $roll['width'],
             $roll['height'],
             $roll['length'],
+            $bale_format,
             $roll['waste'] ?? null,
             $max_id
         ]);
@@ -39,9 +55,24 @@ foreach ($auto_bales as $bale) {
 // Сохраняем ручные бухты
 foreach ($manual_bales as $bale) {
     $max_id++;
+    
+    // Определяем формат для всей бухты - проверяем ВСЕ рулоны
+    $bale_format = '199'; // Предполагаем что это формат 199
     foreach ($bale as $roll) {
-        $stmt = $pdo->prepare("INSERT INTO cut_plans (order_number, manual, filter, paper, width, height, length, waste, bale_id)
-            VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?)");
+        if (isset($roll['width'])) {
+            $width = (float)$roll['width'];
+            // Если хотя бы один рулон НЕ формата 199, то вся бухта формата 1000
+            if (!($width == 199 || ($width >= 175 && $width <= 190))) {
+                $bale_format = '1000';
+                break;
+            }
+        }
+    }
+    
+    // Сохраняем все рулоны бухты с одним форматом
+    foreach ($bale as $roll) {
+        $stmt = $pdo->prepare("INSERT INTO cut_plans (order_number, manual, filter, paper, width, height, length, format, waste, bale_id)
+            VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([
             $order,
             $roll['filter'],
@@ -49,6 +80,7 @@ foreach ($manual_bales as $bale) {
             $roll['width'],
             $roll['height'],
             $roll['length'],
+            $bale_format,
             $roll['waste'] ?? null,
             $max_id
         ]);
