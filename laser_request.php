@@ -43,7 +43,7 @@ function canAccessLaserRequests($userDepartments, $currentDepartment) {
     foreach ($userDepartments as $dept) {
         if ($dept['department_code'] === $currentDepartment) {
             $role = $dept['role_name'];
-            return in_array($role, ['assembler', 'corr_operator', 'master', 'director']) && $role !== 'manager';
+            return in_array($role, ['assembler', 'corr_operator', 'supervisor', 'director']) && $role !== 'manager';
         }
     }
     return false;
@@ -82,13 +82,93 @@ $mysqli->query($create_table_sql);
 $alter_sql = "ALTER TABLE laser_requests ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP NULL AFTER is_completed";
 $mysqli->query($alter_sql);
 
-// Получение списка комплектующих для автодополнения
-$components_query = "SELECT DISTINCT component_name FROM laser_requests ORDER BY component_name";
-$components_result = $mysqli->query($components_query);
+// Создание таблицы для справочника комплектующих
+$create_components_table_sql = "
+CREATE TABLE IF NOT EXISTS laser_components (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    description TEXT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    created_by VARCHAR(255) NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci";
+$mysqli->query($create_components_table_sql);
+
+// Проверяем, является ли пользователь мастером (supervisor)
+$isSupervisor = false;
+foreach ($userDepartments as $dept) {
+    if ($dept['department_code'] === $currentDepartment && $dept['role_name'] === 'supervisor') {
+        $isSupervisor = true;
+        break;
+    }
+}
+
+// Обработка добавления нового комплектующего (только для мастеров)
+if (isset($_POST['action']) && $_POST['action'] === 'add_component' && $isSupervisor) {
+    $component_name = trim($_POST['component_name'] ?? '');
+    $component_description = trim($_POST['component_description'] ?? '');
+    
+    if ($component_name) {
+        $insert_component_sql = "INSERT INTO laser_components (name, description, created_by) VALUES (?, ?, ?)";
+        $stmt = $mysqli->prepare($insert_component_sql);
+        $stmt->bind_param("sss", $component_name, $component_description, $user['full_name']);
+        
+        if ($stmt->execute()) {
+            $success_message = "Комплектующее успешно добавлено!";
+        } else {
+            if ($mysqli->errno === 1062) { // Duplicate entry
+                $error_message = "Комплектующее с таким названием уже существует!";
+            } else {
+                $error_message = "Ошибка при добавлении комплектующего!";
+            }
+        }
+        $stmt->close();
+    }
+}
+
+// Получение списка комплектующих из справочника laser_components
 $components_list = [];
+
+// 1. Загружаем из справочника laser_components
+$components_query = "SELECT name, description, 'laser_components' as source FROM laser_components ORDER BY name";
+$components_result = $mysqli->query($components_query);
 if ($components_result) {
     while ($row = $components_result->fetch_assoc()) {
-        $components_list[] = $row['component_name'];
+        $components_list[] = [
+            'name' => $row['name'],
+            'description' => $row['description'],
+            'source' => 'Справочник'
+        ];
+    }
+}
+
+// 2. Загружаем из таблицы box
+$box_query = "SELECT b_name, b_length, b_width, b_heght, b_supplier FROM box ORDER BY b_name";
+$box_result = $mysqli->query($box_query);
+if ($box_result) {
+    while ($row = $box_result->fetch_assoc()) {
+        $name = "Коробка #{$row['b_name']}";
+        $description = "Длина: {$row['b_length']}мм, Ширина: {$row['b_width']}мм, Высота: {$row['b_heght']}мм, Поставщик: {$row['b_supplier']}";
+        $components_list[] = [
+            'name' => $name,
+            'description' => $description,
+            'source' => 'Коробка'
+        ];
+    }
+}
+
+// 3. Загружаем из таблицы g_box
+$gbox_query = "SELECT gb_name, gb_length, gb_width, gb_heght, gb_supplier FROM g_box ORDER BY gb_name";
+$gbox_result = $mysqli->query($gbox_query);
+if ($gbox_result) {
+    while ($row = $gbox_result->fetch_assoc()) {
+        $name = "Ящик #{$row['gb_name']}";
+        $description = "Длина: {$row['gb_length']}мм, Ширина: {$row['gb_width']}мм, Высота: {$row['gb_heght']}мм, Поставщик: {$row['gb_supplier']}";
+        $components_list[] = [
+            'name' => $name,
+            'description' => $description,
+            'source' => 'Ящик'
+        ];
     }
 }
 
@@ -114,11 +194,6 @@ if (isset($_POST['action']) && $_POST['action'] === 'submit_request') {
         $stmt->close();
         
         $success_message = "Заявка успешно отправлена!";
-        
-        // Обновляем список комплектующих
-        if (!in_array($component_name, $components_list)) {
-            $components_list[] = $component_name;
-        }
     }
 }
 
@@ -370,16 +445,127 @@ $stmt->close();
             }
         }
         
+        .error-message {
+            background: #fecaca;
+            border: 1px solid #f87171;
+            color: #991b1b;
+            padding: 12px 16px;
+            border-radius: var(--radius-sm);
+            margin-bottom: 20px;
+        }
+        
+        /* Модальное окно */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.3s;
+            z-index: 100;
+        }
+        
+        .modal {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            z-index: 101;
+            padding: 20px;
+        }
+        
+        .modal__panel {
+            width: min(500px, calc(100% - 40px));
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.25);
+            transform: translateY(20px) scale(0.95);
+            transition: all 0.3s;
+            opacity: 0;
+            overflow: hidden;
+        }
+        
+        .modal--open .modal__panel {
+            transform: translateY(0) scale(1);
+            opacity: 1;
+        }
+        
+        .modal--open,
+        .modal--open + .modal-backdrop {
+            pointer-events: auto;
+            opacity: 1;
+        }
+        
+        .modal__head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px 24px;
+            border-bottom: 2px solid var(--border);
+            background: var(--gradient-primary, linear-gradient(135deg, #667eea 0%, #764ba2 100%));
+            color: white;
+        }
+        
+        .modal__title {
+            font-size: 18px;
+            font-weight: 600;
+            color: white;
+            margin: 0;
+        }
+        
+        .modal__body {
+            padding: 24px;
+        }
+        
+        .modal__foot {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            padding: 16px 24px;
+            border-top: 1px solid var(--border);
+            background: #f8fafc;
+        }
+        
+        .modal__close {
+            appearance: none;
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            border-radius: var(--radius-sm);
+            padding: 6px 12px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+        
+        .modal__close:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        
     </style>
 </head>
 <body>
     <div class="container">
         
         <div class="panel">
-            <div class="section-title">Заявка на лазерную резку</div>
+            <div class="section-title" style="display: flex; justify-content: space-between; align-items: center;">
+                <span>Заявка на лазерную резку</span>
+                <?php if ($isSupervisor): ?>
+                    <button type="button" onclick="openAddComponentModal()" style="width: 40px; height: 40px; padding: 0; font-size: 24px; line-height: 1; border-radius: 50%;" title="Добавить новое комплектующее">+</button>
+                <?php endif; ?>
+            </div>
             
             <?php if (isset($success_message)): ?>
                 <div class="success-message"><?= htmlspecialchars($success_message) ?></div>
+            <?php endif; ?>
+            
+            <?php if (isset($error_message)): ?>
+                <div class="error-message"><?= htmlspecialchars($error_message) ?></div>
             <?php endif; ?>
             
             <form method="POST" action="">
@@ -387,14 +573,31 @@ $stmt->close();
                 
                 <div class="form-group">
                     <label for="component_name">Комплектующие:</label>
-                    <input type="text" id="component_name" name="component_name" required 
-                           placeholder="Начните вводить название комплектующих..." 
-                           autocomplete="off" list="components_datalist">
-                    <datalist id="components_datalist">
-                        <?php foreach ($components_list as $component): ?>
-                            <option value="<?= htmlspecialchars($component) ?>">
+                    <select id="component_name" name="component_name" required>
+                        <option value="">Выберите комплектующее...</option>
+                        <?php 
+                        // Группируем по источникам
+                        $grouped = [];
+                        foreach ($components_list as $component) {
+                            $source = $component['source'] ?? 'Другое';
+                            if (!isset($grouped[$source])) {
+                                $grouped[$source] = [];
+                            }
+                            $grouped[$source][] = $component;
+                        }
+                        
+                        // Выводим по группам
+                        foreach ($grouped as $source => $items): ?>
+                            <optgroup label="<?= htmlspecialchars($source) ?>">
+                                <?php foreach ($items as $component): ?>
+                                    <option value="<?= htmlspecialchars($component['name']) ?>" 
+                                            title="<?= htmlspecialchars($component['description'] ?? '') ?>">
+                                        <?= htmlspecialchars($component['name']) ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </optgroup>
                         <?php endforeach; ?>
-                    </datalist>
+                    </select>
                 </div>
                 
                 <div class="form-group">
@@ -459,6 +662,38 @@ $stmt->close();
         </div>
     </div>
     
+    <!-- Модальное окно для добавления комплектующего -->
+    <?php if ($isSupervisor): ?>
+    <div id="addComponentModal" class="modal" aria-hidden="true" role="dialog">
+        <div class="modal__panel" role="document">
+            <div class="modal__head">
+                <h3 class="modal__title">Добавить новое комплектующее</h3>
+                <button type="button" class="modal__close" onclick="closeAddComponentModal()" aria-label="Закрыть">Закрыть</button>
+            </div>
+            <form id="addComponentForm" method="POST" action="">
+                <input type="hidden" name="action" value="add_component">
+                <div class="modal__body">
+                    <div class="form-group">
+                        <label for="new_component_name">Название комплектующего:</label>
+                        <input type="text" id="new_component_name" name="component_name" required 
+                               placeholder="Введите название комплектующего">
+                    </div>
+                    <div class="form-group">
+                        <label for="new_component_description">Описание (необязательно):</label>
+                        <input type="text" id="new_component_description" name="component_description" 
+                               placeholder="Введите описание">
+                    </div>
+                </div>
+                <div class="modal__foot">
+                    <button type="button" class="modal__close" onclick="closeAddComponentModal()">Отмена</button>
+                    <button type="submit" class="btn">Добавить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div id="addComponentBackdrop" class="modal-backdrop"></div>
+    <?php endif; ?>
+    
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // Устанавливаем минимальную дату на сегодня
@@ -468,6 +703,56 @@ $stmt->close();
                 dateInput.min = today.toISOString().split('T')[0];
             }
         });
+        
+        <?php if ($isSupervisor): ?>
+        // Функции для управления модальным окном
+        function openAddComponentModal() {
+            const modal = document.getElementById('addComponentModal');
+            const backdrop = document.getElementById('addComponentBackdrop');
+            const firstInput = document.getElementById('new_component_name');
+            
+            if (modal && backdrop) {
+                modal.classList.add('modal--open');
+                backdrop.classList.add('modal--open');
+                modal.setAttribute('aria-hidden', 'false');
+                
+                setTimeout(() => {
+                    if (firstInput) firstInput.focus();
+                }, 100);
+                
+                document.addEventListener('keydown', handleEscapeKey);
+            }
+        }
+        
+        function closeAddComponentModal() {
+            const modal = document.getElementById('addComponentModal');
+            const backdrop = document.getElementById('addComponentBackdrop');
+            
+            if (modal && backdrop) {
+                modal.classList.remove('modal--open');
+                backdrop.classList.remove('modal--open');
+                modal.setAttribute('aria-hidden', 'true');
+                
+                // Очищаем форму
+                const form = document.getElementById('addComponentForm');
+                if (form) form.reset();
+                
+                document.removeEventListener('keydown', handleEscapeKey);
+            }
+        }
+        
+        function handleEscapeKey(e) {
+            if (e.key === 'Escape') {
+                closeAddComponentModal();
+            }
+        }
+        
+        // Закрытие модального окна по клику на backdrop
+        const backdrop = document.getElementById('addComponentBackdrop');
+        if (backdrop) {
+            backdrop.addEventListener('click', closeAddComponentModal);
+        }
+        <?php endif; ?>
     </script>
 </body>
 </html>

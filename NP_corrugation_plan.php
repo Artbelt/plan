@@ -126,9 +126,9 @@ try {
         $paper_info = $paper_data[$filter_info['paper_package'] ?? ''] ?? [];
         $form_factor_name = $form_factors[$filter_info['form_factor_id'] ?? ''] ?? '';
         
-        // Отладка для MRA-076
-        if (strpos($pos['filter'], 'MRA-076') !== false) {
-            error_log("MRA-076 финальные данные:");
+        // Отладка для MRA-076 и AF1601s
+        if (strpos($pos['filter'], 'MRA-076') !== false || strpos($pos['filter'], 'AF1601s') !== false) {
+            error_log("=== DEBUG for " . $pos['filter'] . " ===");
             error_log("- pos[filter]: " . $pos['filter']);
             error_log("- filter_info: " . json_encode($filter_info));
             error_log("- paper_package: " . ($filter_info['paper_package'] ?? 'NULL'));
@@ -187,9 +187,9 @@ foreach ($positions as $p) {
     $pleats = intval($p['p_p_pleats_count'] ?? 0);
     $pleat_height = floatval($p['p_p_height'] ?? 0);
     
-    // Отладка для MRA-076
-    if (strpos($p['filter'], 'MRA-076') !== false) {
-        error_log("MRA-076 отладка:");
+    // Отладка для MRA-076 и AF1601s
+    if (strpos($p['filter'], 'MRA-076') !== false || strpos($p['filter'], 'AF1601s') !== false) {
+        error_log("=== DEBUG for " . $p['filter'] . " ===");
         error_log("- filter: " . $p['filter']);
         error_log("- height (cut_plans): " . ($p['height'] ?? 'NULL'));
         error_log("- p_p_height (paper_package_panel): " . ($p['p_p_height'] ?? 'NULL'));
@@ -244,17 +244,15 @@ try {
         }
         
         /* Подсветка одинаковых позиций при наведении */
-        .position-cell .highlighted-text {
-            background-color: #ffeb3b !important;
-            color: #000 !important;
-            font-weight: bold !important;
-            padding: 1px 3px !important;
-            border-radius: 2px !important;
+        .position-cell.highlighted {
+            border: 2px solid #f44336 !important;
+            box-shadow: 0 0 5px rgba(244, 67, 54, 0.8) !important;
         }
         .position-cell {
             cursor: pointer;
             padding: 3px;
             border-bottom: 1px dotted #ccc;
+            border: 2px solid transparent; /* Прозрачная граница по умолчанию */
             display: block;
             margin-bottom: 2px;
             position: relative;
@@ -291,51 +289,220 @@ try {
             position: fixed;
             top: 20px;
             right: 20px;
-            background: #fff3cd;
-            border: 2px solid #ffc107;
+            background: #fffacd; /* Пастельный желтый */
+            border: 2px solid #333;
             border-radius: 8px;
             padding: 10px;
-            font-size: 10px;
-            min-width: 180px;
-            cursor: move;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            font-size: 12px;
             z-index: 1000;
+            cursor: move;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            min-width: 200px;
+            max-width: 300px;
+            max-height: 80vh;
+            overflow-y: auto;
             user-select: none;
             -webkit-user-select: none;
             -moz-user-select: none;
             -ms-user-select: none;
         }
+        
+        .panel-header {
+            border-bottom: 1px solid #e0e0e0;
+            padding: 15px;
+            margin-bottom: 15px;
+            position: sticky;
+            top: 0;
+            background: linear-gradient(135deg, #fff8e1, #fffacd);
+            z-index: 10;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            min-height: 150px; /* Увеличиваем высоту панели */
+        }
+        
+        .info-item {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 8px;
+            padding: 8px 10px;
+            background: rgba(255, 255, 255, 0.7);
+            border-radius: 6px;
+        }
+        
+        .info-label {
+            font-weight: 600;
+            color: #333;
+            font-size: 11px;
+        }
+        
+        .info-value {
+            font-weight: normal;
+            color: #333;
+            font-size: 12px;
+        }
+        
+        .info-separator {
+            color: #666;
+            font-size: 12px;
+            margin: 0 5px;
+        }
+        
+        .legend-section {
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .legend-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 11px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 4px;
+            font-size: 10px;
+            color: #555;
+        }
+        
+        .legend-icon {
+            margin-right: 6px;
+            font-weight: bold;
+        }
+        
+        .planning-list {
+            margin-top: 15px;
+            padding-top: 15px;
+        }
+        
+        
+        .list-header {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #333;
+        }
+        
+        .planning-day {
+            margin-bottom: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: #f9f9f9;
+        }
+        
+        .day-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 8px;
+            background: #e9e9e9;
+            border-radius: 3px 3px 0 0;
+            font-size: 11px;
+        }
+        
+        .day-date {
+            font-weight: bold;
+        }
+        
+        .day-summary {
+            color: #666;
+            font-size: 10px;
+        }
+        
+        .planning-day .drop-target {
+            min-height: 30px;
+            padding: 4px;
+            background: white;
+            border-radius: 0 0 3px 3px;
+        }
+        
+        .planning-day .assigned-item {
+            background-color: #8996d7;
+            color: #333;
+            border-radius: 4px;
+            padding: 2px 4px;
+            margin: 1px 0;
+            font-size: 10px;
+            cursor: pointer;
+        }
         .active-day-info.dragging {
             opacity: 0.8;
-        }
-        .active-day-info.hidden {
-            display: none;
         }
     </style>
 </head>
 <body>
 <!-- Перетаскиваемая плашка с информацией об активном дне -->
-<div id="active-day-info" class="active-day-info hidden">
-    <div><strong>Активный день:</strong></div>
-    <div id="active-day-date">Не выбран</div>
-    <div><strong>Гофропакеты:</strong></div>
-    <div id="active-day-count">0 шт</div>
+<div id="active-day-info" class="active-day-info">
+
+    <div class="panel-header">
+        <div class="info-item">
+            <span class="info-value" id="active-day-date">Не выбран</span>
+            <span class="info-separator"> | </span>
+            <span class="info-value" id="active-day-count">0 шт</span>
+        </div>
+        
+        <div class="legend-section">
+            <div class="legend-title">Легенда:</div>
+            <div class="legend-item">
+                <span class="legend-icon">●</span>
+                <span>Проливка</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-icon">◩</span>
+                <span>Предфильтр</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-icon">⏃</span>
+                <span>Трапеция</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-icon">⏃◯</span>
+                <span>Трапеция с обечайкой</span>
+            </div>
+        </div>
+        
+        <div style="margin-top: 15px; text-align: center;">
+            <strong style="color: #ff9800; font-size: 12px;">План гофрирования</strong>
+        </div>
+    </div>
+    
+    <div class="planning-list">
+        <div id="planning-days-list">
+            <?php foreach ($dates as $d): ?>
+                <div class="planning-day" data-date="<?= $d ?>">
+                    <div class="day-header">
+                        <span class="day-date"><?= $d ?></span>
+                        <span class="day-summary" id="summary-<?= $d ?>">0 шт</span>
+                    </div>
+                    <div class="drop-target" data-date="<?= $d ?>"></div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
 </div>
 
-<h2>Планирование гофрирования для заявки <?= htmlspecialchars($order) ?></h2>
-<form method="get" style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <h2 style="font-size: 18px; font-weight: normal; margin: 0;">Планирование гофрирования для заявки <?= htmlspecialchars($order) ?></h2>
+    <div style="display: flex; align-items: center; gap: 15px;">
+        <form method="get" style="display:flex; align-items:center; gap:10px; margin:0;">
     Дата начала: <input type="date" name="start" value="<?= htmlspecialchars($_GET['start'] ?? date('Y-m-d')) ?>">
     Дней: <input type="number" name="days" value="<?= $days ?>" min="1" max="90">
     <input type="hidden" name="order" value="<?= htmlspecialchars($order) ?>">
-    <button type="submit">Построить таблицу</button>
-    <button type="button" onclick="addDay()">Добавить день</button>
+            <button type="submit">Применить дни</button>
+            <button type="button" onclick="addDay()" style="display: none;">Добавить день</button>
 </form>
 
-
-
-<h3>Доступные позиции из раскроя</h3>
-<div class="legend">
-    Проливка ● | Предфильтр ◩ | Трапеция ⏃ | Трапеция с обечайкой ⏃◯
+        <div style="display: flex; gap: 10px;">
+            <button type="button" onclick="loadExistingPlan()">Загрузить план</button>
+            <button type="button" onclick="savePlan(false)">Сохранить</button>
+            <button type="button" onclick="preparePlan()">Завершить</button>
+        </div>
+    </div>
 </div>
 <table id="top-table">
     <tr>
@@ -363,32 +530,9 @@ try {
     </tr>
 </table>
 
-<h3>Планирование гофрирования</h3>
-<form method="post" action="NP/save_corrugation_plan.php">
+<form method="post" action="NP/save_corrugation_plan.php" style="display: none;">
     <input type="hidden" name="order" value="<?= htmlspecialchars($order) ?>">
-    <table id="bottom-table">
-        <tr>
-            <?php foreach ($dates as $d): ?>
-                <th><?= $d ?></th>
-            <?php endforeach; ?>
-        </tr>
-        <tr>
-            <?php foreach ($dates as $d): ?>
-                <td class="drop-target" data-date="<?= $d ?>"></td>
-            <?php endforeach; ?>
-        </tr>
-        <tr class="summary-row">
-            <?php foreach ($dates as $d): ?>
-                <td class="summary" id="summary-<?= $d ?>">0 шт</td>
-            <?php endforeach; ?>
-        </tr>
-    </table>
     <input type="hidden" name="plan_data" id="plan_data">
-    <div style="display: flex; gap: 10px; margin-top: 10px;">
-        <button type="button" onclick="loadExistingPlan()">Загрузить план</button>
-        <button type="button" onclick="savePlan(false)">Сохранить</button>
-        <button type="submit" onclick="preparePlan()">Завершить</button>
-    </div>
 </form>
 
 <div class="modal" id="modal">
@@ -415,13 +559,16 @@ try {
     }
 
     // Функция для обновления плашки активного дня
-    function updateActiveDayInfo() {
+    function updateActiveDayInfo(forceScroll = false) {
         const infoDiv = document.getElementById('active-day-info');
         const dateDiv = document.getElementById('active-day-date');
         const countDiv = document.getElementById('active-day-count');
         
+        // Проверяем, изменился ли активный день
+        const previousActiveDay = dateDiv.textContent;
+        const activeDayChanged = previousActiveDay !== activeDay;
+        
         if (activeDay) {
-            infoDiv.classList.remove('hidden');
             dateDiv.textContent = activeDay;
             
             // Считаем количество гофропакетов в активном дне
@@ -442,8 +589,63 @@ try {
             } else {
                 countDiv.textContent = '0 шт';
             }
+            
+            // Прокручиваем только если активный день изменился или принудительно
+            if (activeDayChanged || forceScroll) {
+                scrollToActiveDay();
+            }
         } else {
-            infoDiv.classList.add('hidden');
+            dateDiv.textContent = 'Не выбран';
+            countDiv.textContent = '0 шт';
+        }
+    }
+    
+    function scrollToActiveDay() {
+        if (!activeDay) return;
+        
+        console.log('=== SCROLL DEBUG ===');
+        console.log('activeDay:', activeDay);
+        
+        // Пробуем прокручивать основной контейнер плавающей панели
+        const activeDayInfo = document.getElementById('active-day-info');
+        const activeDayElement = document.querySelector('.planning-day[data-date="' + activeDay + '"]');
+        
+        console.log('activeDayInfo:', activeDayInfo);
+        console.log('activeDayElement:', activeDayElement);
+        
+        if (activeDayInfo && activeDayElement) {
+            console.log('Found both elements, scrolling...');
+            
+            // Вычисляем позицию элемента относительно прокручиваемого контейнера
+            const containerRect = activeDayInfo.getBoundingClientRect();
+            const elementRect = activeDayElement.getBoundingClientRect();
+            
+            console.log('containerRect:', containerRect);
+            console.log('elementRect:', elementRect);
+            
+            // Вычисляем смещение элемента внутри контейнера
+            const elementTop = elementRect.top - containerRect.top + activeDayInfo.scrollTop;
+            
+            console.log('elementTop:', elementTop);
+            console.log('current scrollTop:', activeDayInfo.scrollTop);
+            
+            // Прокручиваем к элементу с учетом отступа от заголовка
+            activeDayInfo.scrollTo({
+                top: elementTop - 40,
+                behavior: 'smooth'
+            });
+            
+            // Альтернативный метод если scrollTo не работает
+            setTimeout(() => {
+                activeDayElement.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center'
+                });
+            }, 100);
+            
+            console.log('Scroll command executed');
+        } else {
+            console.log('Elements not found!');
         }
     }
 
@@ -560,17 +762,15 @@ try {
         // Функция для подсветки одинаковых позиций
         function highlightSimilarPositions(filterName) {
             // Убираем предыдущую подсветку
-            document.querySelectorAll('.position-cell .highlighted-text').forEach(span => {
-                const parent = span.parentNode;
-                parent.innerHTML = parent.textContent; // Восстанавливаем оригинальный текст
+            document.querySelectorAll('.position-cell.highlighted').forEach(cell => {
+                cell.classList.remove('highlighted');
             });
             
             // Подсвечиваем все позиции с таким же названием
-            document.querySelectorAll('.position-cell').forEach(cell => {
+    document.querySelectorAll('.position-cell').forEach(cell => {
                 const cellFilter = cell.dataset.filter || '';
                 if (cellFilter === filterName) {
-                    const originalText = cell.textContent;
-                    cell.innerHTML = `<span class="highlighted-text">${originalText}</span>`;
+                    cell.classList.add('highlighted');
                 }
             });
         }
@@ -640,9 +840,18 @@ try {
                     const btn = document.createElement('button');
                     btn.textContent = date;
                     btn.onclick = () => {
-                        const rollLengthMm = selectedData.length * 1000;
+                        const rollLengthMm = selectedData.length * 1000; // length в метрах, конвертируем в мм
                         const blankLength = selectedData.pleats * selectedData.height * 2;
                         
+                        // Отладка для AF1601s
+                        if (selectedData.label && selectedData.label.includes('AF1601s')) {
+                            console.log('=== AF1601s DEBUG ===');
+                            console.log('selectedData:', selectedData);
+                            console.log('rollLengthMm:', rollLengthMm);
+                            console.log('blankLength:', blankLength);
+                            console.log('pleats:', selectedData.pleats);
+                            console.log('height:', selectedData.height);
+                        }
                         
                         // Проверяем деление на ноль
                         let qty = 0;
@@ -655,6 +864,15 @@ try {
                             return;
                         }
 
+                        // Отладка для AF1601s
+                        if (selectedData.label && selectedData.label.includes('AF1601s')) {
+                            console.log('=== AF1601s MODAL DEBUG ===');
+                            console.log('qty before check:', qty);
+                            console.log('isFinite(qty):', isFinite(qty));
+                            console.log('isNaN(qty):', isNaN(qty));
+                            console.log('qty <= 0:', qty <= 0);
+                        }
+                        
                         // Проверяем что qty корректное число
                         if (!isFinite(qty) || isNaN(qty) || qty <= 0) {
                             console.warn('Некорректное количество для добавления (модалка):', qty);
@@ -700,9 +918,8 @@ try {
                 setTimeout(() => {
                     const hoveredCell = document.querySelector('.position-cell:hover');
                     if (!hoveredCell) {
-                        document.querySelectorAll('.position-cell .highlighted-text').forEach(span => {
-                            const parent = span.parentNode;
-                            parent.innerHTML = parent.textContent; // Восстанавливаем оригинальный текст
+                        document.querySelectorAll('.position-cell.highlighted').forEach(cell => {
+                            cell.classList.remove('highlighted');
                         });
                     }
                 }, 100);
@@ -813,8 +1030,31 @@ try {
         newSummaryTd.innerText = "0 шт";
         summaryRow.appendChild(newSummaryTd);
         
+        // Добавляем день в плавающую панель
+        addDayToFloatingPanel(newDateStr);
+        
         // Обновляем визуализацию активного дня после добавления нового дня
         updateActiveDayVisual();
+    }
+    
+    function addDayToFloatingPanel(newDateStr) {
+        const planningDaysList = document.getElementById('planning-days-list');
+        
+        // Создаем новый элемент дня для плавающей панели
+        const newPlanningDay = document.createElement('div');
+        newPlanningDay.className = 'planning-day';
+        newPlanningDay.setAttribute('data-date', newDateStr);
+        
+        newPlanningDay.innerHTML = `
+            <div class="day-header">
+                <span class="day-date">${newDateStr}</span>
+                <span class="day-summary" id="summary-${newDateStr}">0 шт</span>
+            </div>
+            <div class="drop-target" data-date="${newDateStr}"></div>
+        `;
+        
+        // Добавляем новый день в конец списка
+        planningDaysList.appendChild(newPlanningDay);
     }
 
     function loadExistingPlan(showAlert = true) {
@@ -841,20 +1081,69 @@ try {
             if (targetTd) {
                 // Находим соответствующую позицию в верхней таблице
                 const positionCell = Array.from(document.querySelectorAll('.position-cell')).find(cell => {
-                    // Проверяем как точное совпадение, так и частичное (для случаев когда в filter_label только часть имени)
+                    // Проверяем точное совпадение
                     const cellFilter = cell.dataset.filter || '';
                     const savedFilter = item.filter_label || '';
                     
-                    return (cellFilter === savedFilter || 
-                            cellFilter.includes(savedFilter) || 
-                            savedFilter.includes(cellFilter.replace(/ \[.*?\].*/, ''))) 
-                           && !cell.classList.contains('used');
+                    // Сначала проверяем точное совпадение
+                    if (cellFilter === savedFilter) {
+                        return !cell.classList.contains('used');
+                    }
+                    
+                    // Затем проверяем частичное совпадение только если это не точное совпадение
+                    const cellBaseName = cellFilter.replace(/ \[.*?\].*/, '');
+                    const savedBaseName = savedFilter.replace(/ \[.*?\].*/, '');
+                    
+                    // Проверяем, что базовые имена совпадают точно (не частично)
+                    if (cellBaseName === savedBaseName) {
+                        return !cell.classList.contains('used');
+                    }
+                    
+                    return false;
                 });
                 
                 console.log('Loading plan item:', {
                     filter_label: item.filter_label,
                     found_cell: positionCell ? positionCell.dataset.filter : 'NOT_FOUND'
                 });
+                
+                // Отладка для AF1601s
+                if (item.filter_label && item.filter_label.includes('AF1601s')) {
+                    console.log('=== AF1601s LOAD DEBUG ===');
+                    console.log('savedFilter:', item.filter_label);
+                    
+                    // Подсчитаем точное количество ячеек
+                    const allCells = document.querySelectorAll('.position-cell');
+                    const af1601Cells = Array.from(allCells).filter(cell => cell.dataset.filter === 'AF1601 [48] 199');
+                    const af1601sCells = Array.from(allCells).filter(cell => cell.dataset.filter === 'AF1601s [48] 199');
+                    
+                    console.log('=== COUNTING DEBUG ===');
+                    console.log('Total position cells:', allCells.length);
+                    console.log('AF1601 [48] 199 cells:', af1601Cells.length);
+                    console.log('AF1601s [48] 199 cells:', af1601sCells.length);
+                    
+                    // Подсчитаем used/unused
+                    const af1601Used = af1601Cells.filter(cell => cell.classList.contains('used')).length;
+                    const af1601Unused = af1601Cells.filter(cell => !cell.classList.contains('used')).length;
+                    const af1601sUsed = af1601sCells.filter(cell => cell.classList.contains('used')).length;
+                    const af1601sUnused = af1601sCells.filter(cell => !cell.classList.contains('used')).length;
+                    
+                    console.log('AF1601 used:', af1601Used, 'unused:', af1601Unused);
+                    console.log('AF1601s used:', af1601sUsed, 'unused:', af1601sUnused);
+                    
+                    // Проверим логику сопоставления
+                    const testCell = Array.from(document.querySelectorAll('.position-cell')).find(cell => {
+                        const cellFilter = cell.dataset.filter || '';
+                        const savedFilter = item.filter_label || '';
+                        
+                        return (cellFilter === savedFilter || 
+                                cellFilter.includes(savedFilter) || 
+                                savedFilter.includes(cellFilter.replace(/ \[.*?\].*/, ''))) 
+                               && !cell.classList.contains('used');
+                    });
+                    
+                    console.log('Found cell for AF1601s:', testCell);
+                }
                 
                 if (positionCell) {
                     // Проверяем корректность количества

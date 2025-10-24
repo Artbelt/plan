@@ -73,8 +73,8 @@ function canAccessLaserRequests($userDepartments, $currentDepartment) {
     foreach ($userDepartments as $dept) {
         if ($dept['department_code'] === $currentDepartment) {
             $role = $dept['role_name'];
-            // Доступ имеют: сборщики, мастера, директора (но не менеджеры)
-            return in_array($role, ['assembler', 'master', 'director']);
+            // Доступ имеют: сборщики, мастера (supervisor), директора (но не менеджеры)
+            return in_array($role, ['assembler', 'supervisor', 'director']);
         }
     }
     return false;
@@ -575,7 +575,7 @@ $advertisement = 'Информация';
                     <form action="product_output_view.php" method="post" class="stack"><input type="submit" value="Обзор выпуска продукции"></form>
                     <form action="parts_output_view.php" method="post" class="stack"><input type="submit" value="Обзор изготовленных гофропакетов"></form>
                     <?php if ($canAccessLaser): ?>
-                    <a href="laser_request.php" target="_blank" rel="noopener" class="stack"><button>Заявка на лазер</button></a>
+                    <a href="laser_request.php" target="_blank" rel="noopener"><button type="button">Заявка на лазер</button></a>
                     <?php endif; ?>
                 </div>
 
