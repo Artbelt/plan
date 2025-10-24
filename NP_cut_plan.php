@@ -1003,24 +1003,56 @@ else:
     $check = ($total_used + $total_left === $total_initial);
     $check_format199 = ($total_format199_used === $total_format199_initial);
     
-    echo "<h3>Проверка количества полос:</h3>";
-    echo "<p><strong>Основные рулоны:</strong><br>";
-    echo "Всего в заявке: <b>$total_initial</b><br>";
-    echo "Упаковано в бухты: <b>$total_used</b><br>";
-    echo "Осталось неиспользованных: <b>$total_left</b><br>";
-    echo "Сумма совпадает: <b style='color:" . ($check ? "green" : "red") . "'>" . ($check ? "ДА ✅" : "НЕТ ❌") . "</b></p>";
-    
-    if ($total_format199_initial > 0) {
-        $check_format199 = ($total_format199_used === $total_format199_initial);
-        
-        echo "<p><strong style='color: #0066cc;'>Рулоны формата 199 (каждый рулон = отдельная бухта):</strong><br>";
-        echo "Всего рулонов формата 199: <b>$total_format199_initial</b><br>";
-        echo "Создано бухт формата 199: <b>$total_format199_used</b><br>";
-        echo "Сумма совпадает: <b style='color:" . ($check_format199 ? "green" : "red") . "'>" . ($check_format199 ? "ДА ✅" : "НЕТ ❌") . "</b></p>";
-    }
-
-    ?>
+?>
 </table>
+
+<!-- Блок проверки количества полос -->
+    <div style="margin: 30px auto; max-width: 700px; background: #f9f9f9; border: 2px solid #ddd; border-radius: 12px; padding: 25px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <h3 style="text-align: center; margin: 0 0 20px 0; color: #333; font-size: 18px; border-bottom: 2px solid #667eea; padding-bottom: 10px;">
+            📊 Проверка количества полос
+        </h3>
+        
+        <div style="background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; border-left: 4px solid #4caf50;">
+            <p style="margin: 0 0 10px 0;"><strong style="font-size: 14px;">Основные рулоны:</strong></p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px;">
+                <div>Всего в заявке:</div>
+                <div><b><?= $total_initial ?></b></div>
+                
+                <div>Упаковано в бухты:</div>
+                <div><b><?= $total_used ?></b></div>
+                
+                <div>Осталось неиспользованных:</div>
+                <div><b><?= $total_left ?></b></div>
+                
+                <div style="padding-top: 8px; border-top: 1px solid #eee;">Сумма совпадает:</div>
+                <div style="padding-top: 8px; border-top: 1px solid #eee;">
+                    <b style="color: <?= $check ? 'green' : 'red' ?>; font-size: 14px;">
+                        <?= $check ? 'ДА ✅' : 'НЕТ ❌' ?>
+                    </b>
+                </div>
+            </div>
+        </div>
+        
+        <?php if ($total_format199_initial > 0): ?>
+        <div style="background: white; padding: 15px; border-radius: 8px; border-left: 4px solid #2196f3;">
+            <p style="margin: 0 0 10px 0;"><strong style="font-size: 14px; color: #0066cc;">Рулоны формата 199 (каждый рулон = отдельная бухта):</strong></p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px;">
+                <div>Всего рулонов формата 199:</div>
+                <div><b><?= $total_format199_initial ?></b></div>
+                
+                <div>Создано бухт формата 199:</div>
+                <div><b><?= $total_format199_used ?></b></div>
+                
+                <div style="padding-top: 8px; border-top: 1px solid #eee;">Сумма совпадает:</div>
+                <div style="padding-top: 8px; border-top: 1px solid #eee;">
+                    <b style="color: <?= $check_format199 ? 'green' : 'red' ?>; font-size: 14px;">
+                        <?= $check_format199 ? 'ДА ✅' : 'НЕТ ❌' ?>
+                    </b>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+    </div>
 
 <h3>Рулоны 1000 м</h3>
 <table>
