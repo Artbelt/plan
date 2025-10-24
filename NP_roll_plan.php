@@ -250,6 +250,99 @@ foreach ($rows as $r) {
             thead th:first-child, tbody td:first-child, tfoot td:first-child{ min-width:140px; }
             .btn{ width:100%; }
         }
+        
+        /* Плавающая панель поиска */
+        .search-panel {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 320px;
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            z-index: 1000;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .search-panel__header {
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px 10px 0 0;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .search-panel__input {
+            padding: 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .search-panel__input input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 13px;
+            box-sizing: border-box;
+        }
+        
+        .search-panel__input input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .search-panel__results {
+            padding: 10px;
+            overflow-y: auto;
+            flex: 1;
+        }
+        
+        .search-result-item {
+            padding: 10px;
+            background: #f9f9f9;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .search-result-item:hover {
+            background: #f0f4ff;
+            border-color: #667eea;
+            transform: translateX(-2px);
+        }
+        
+        .search-result-item__bale {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 4px;
+            font-size: 13px;
+        }
+        
+        .search-result-item__filters {
+            font-size: 11px;
+            color: #666;
+        }
+        
+        .search-result-highlight {
+            background: #fff59d;
+            padding: 1px 3px;
+            border-radius: 2px;
+            font-weight: 600;
+        }
+        
+        .no-results {
+            text-align: center;
+            color: #999;
+            padding: 40px 20px;
+            font-size: 13px;
+        }
     </style>
 </head>
 <body>
@@ -689,6 +782,99 @@ foreach ($rows as $r) {
         el.value = today.toISOString().slice(0,10);
         buildHeightBar();
     })();
+    
+    // ==================== ПОИСК ФИЛЬТРОВ ====================
+    
+    function searchFilterInBales() {
+        const searchText = document.getElementById('filterSearchInput').value.toLowerCase().trim();
+        const resultsContainer = document.getElementById('searchResults');
+        
+        if (searchText === '') {
+            resultsContainer.innerHTML = '<div class="no-results">Введите название фильтра для поиска</div>';
+            return;
+        }
+        
+        // Ищем в данных BALES
+        const results = [];
+        BALES.forEach(bale => {
+            const matchingFilters = [];
+            bale.strips.forEach(strip => {
+                if (strip.filter.toLowerCase().includes(searchText)) {
+                    matchingFilters.push(strip.filter);
+                }
+            });
+            
+            if (matchingFilters.length > 0) {
+                results.push({
+                    bale_id: bale.bale_id,
+                    format: bale.format || '1000',
+                    filters: matchingFilters
+                });
+            }
+        });
+        
+        // Отображаем результаты
+        if (results.length === 0) {
+            resultsContainer.innerHTML = '<div class="no-results">Ничего не найдено</div>';
+            return;
+        }
+        
+        resultsContainer.innerHTML = results.map(result => {
+            const uniqueFilters = [...new Set(result.filters)];
+            const filtersHtml = uniqueFilters.map(filter => {
+                const highlighted = filter.replace(new RegExp(searchText, 'gi'), match => 
+                    `<span class="search-result-highlight">${match}</span>`
+                );
+                return highlighted;
+            }).join(', ');
+            
+            return `
+                <div class="search-result-item" onclick="scrollToBale(${result.bale_id})">
+                    <div class="search-result-item__bale">
+                        Бухта #${result.bale_id} [${result.format}]
+                    </div>
+                    <div class="search-result-item__filters">
+                        ${filtersHtml}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+    
+    function scrollToBale(baleId) {
+        // Находим элемент с названием бухты
+        const baleElement = document.querySelector(`.bale-name[data-bale-id="${baleId}"]`);
+        
+        if (baleElement) {
+            // Подсвечиваем бухту
+            baleElement.classList.add('bale-picked');
+            
+            // Скроллим к элементу
+            baleElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            // Убираем подсветку через 3 секунды
+            setTimeout(() => {
+                baleElement.classList.remove('bale-picked');
+            }, 3000);
+        }
+    }
 </script>
+
+<!-- Плавающая панель поиска -->
+<div class="search-panel">
+    <div class="search-panel__header">
+        🔍 Поиск фильтра в бухтах
+    </div>
+    <div class="search-panel__input">
+        <input type="text" 
+               id="filterSearchInput" 
+               placeholder="Введите название фильтра..." 
+               oninput="searchFilterInBales()">
+    </div>
+    <div class="search-panel__results" id="searchResults">
+        <div class="no-results">Введите название фильтра для поиска</div>
+    </div>
+</div>
+
 </body>
 </html>

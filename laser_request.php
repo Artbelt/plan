@@ -126,49 +126,13 @@ if (isset($_POST['action']) && $_POST['action'] === 'add_component' && $isSuperv
     }
 }
 
-// Получение списка комплектующих из справочника laser_components
-$components_list = [];
-
-// 1. Загружаем из справочника laser_components
-$components_query = "SELECT name, description, 'laser_components' as source FROM laser_components ORDER BY name";
+// Получение списка комплектующих для автодополнения
+$components_query = "SELECT DISTINCT component_name FROM laser_requests ORDER BY component_name";
 $components_result = $mysqli->query($components_query);
+$components_list = [];
 if ($components_result) {
     while ($row = $components_result->fetch_assoc()) {
-        $components_list[] = [
-            'name' => $row['name'],
-            'description' => $row['description'],
-            'source' => 'Справочник'
-        ];
-    }
-}
-
-// 2. Загружаем из таблицы box
-$box_query = "SELECT b_name, b_length, b_width, b_heght, b_supplier FROM box ORDER BY b_name";
-$box_result = $mysqli->query($box_query);
-if ($box_result) {
-    while ($row = $box_result->fetch_assoc()) {
-        $name = "Коробка #{$row['b_name']}";
-        $description = "Длина: {$row['b_length']}мм, Ширина: {$row['b_width']}мм, Высота: {$row['b_heght']}мм, Поставщик: {$row['b_supplier']}";
-        $components_list[] = [
-            'name' => $name,
-            'description' => $description,
-            'source' => 'Коробка'
-        ];
-    }
-}
-
-// 3. Загружаем из таблицы g_box
-$gbox_query = "SELECT gb_name, gb_length, gb_width, gb_heght, gb_supplier FROM g_box ORDER BY gb_name";
-$gbox_result = $mysqli->query($gbox_query);
-if ($gbox_result) {
-    while ($row = $gbox_result->fetch_assoc()) {
-        $name = "Ящик #{$row['gb_name']}";
-        $description = "Длина: {$row['gb_length']}мм, Ширина: {$row['gb_width']}мм, Высота: {$row['gb_heght']}мм, Поставщик: {$row['gb_supplier']}";
-        $components_list[] = [
-            'name' => $name,
-            'description' => $description,
-            'source' => 'Ящик'
-        ];
+        $components_list[] = $row['component_name'];
     }
 }
 
@@ -573,31 +537,14 @@ $stmt->close();
                 
                 <div class="form-group">
                     <label for="component_name">Комплектующие:</label>
-                    <select id="component_name" name="component_name" required>
-                        <option value="">Выберите комплектующее...</option>
-                        <?php 
-                        // Группируем по источникам
-                        $grouped = [];
-                        foreach ($components_list as $component) {
-                            $source = $component['source'] ?? 'Другое';
-                            if (!isset($grouped[$source])) {
-                                $grouped[$source] = [];
-                            }
-                            $grouped[$source][] = $component;
-                        }
-                        
-                        // Выводим по группам
-                        foreach ($grouped as $source => $items): ?>
-                            <optgroup label="<?= htmlspecialchars($source) ?>">
-                                <?php foreach ($items as $component): ?>
-                                    <option value="<?= htmlspecialchars($component['name']) ?>" 
-                                            title="<?= htmlspecialchars($component['description'] ?? '') ?>">
-                                        <?= htmlspecialchars($component['name']) ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </optgroup>
+                    <input type="text" id="component_name" name="component_name" required 
+                           placeholder="Введите название комплектующих..." 
+                           autocomplete="off" list="components_datalist">
+                    <datalist id="components_datalist">
+                        <?php foreach ($components_list as $component): ?>
+                            <option value="<?= htmlspecialchars($component) ?>">
                         <?php endforeach; ?>
-                    </select>
+                    </datalist>
                 </div>
                 
                 <div class="form-group">
