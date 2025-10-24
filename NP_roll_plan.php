@@ -335,23 +335,18 @@ foreach ($rows as $r) {
             color: #666;
         }
         
-        .bale-status {
-            display: inline-block;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-size: 9px;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-        
-        .bale-status--planned {
-            background: #d4edda;
-            color: #155724;
-        }
-        
-        .bale-status--not-planned {
-            background: #f8d7da;
-            color: #721c24;
+        .bale-status-check {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #4caf50;
+            color: white;
+            font-size: 10px;
+            font-weight: bold;
+            flex-shrink: 0;
         }
         
         .search-result-highlight {
@@ -864,14 +859,13 @@ foreach ($rows as $r) {
                 return highlighted;
             }).join(', ');
             
-            const statusClass = result.isPlanned ? 'bale-status--planned' : 'bale-status--not-planned';
-            const statusText = result.isPlanned ? 'План' : 'Нет';
+            const statusIcon = result.isPlanned ? '<span class="bale-status-check">✓</span>' : '';
             
             return `
                 <div class="search-result-item" onclick="scrollToBale(${result.bale_id})">
                     <div class="search-result-item__bale">
                         <span>Бухта #${result.bale_id} [${result.format}]</span>
-                        <span class="bale-status ${statusClass}">${statusText}</span>
+                        ${statusIcon}
                     </div>
                     <div class="search-result-item__filters">
                         ${filtersHtml}
@@ -901,15 +895,17 @@ foreach ($rows as $r) {
     
     // ==================== ПЕРЕТАСКИВАНИЕ ПАНЕЛИ ====================
     
-    (function initDraggablePanel() {
+    document.addEventListener('DOMContentLoaded', function() {
         const panel = document.querySelector('.search-panel');
         const header = document.querySelector('.search-panel__header');
         
+        if (!panel || !header) return;
+        
         let isDragging = false;
-        let currentX;
-        let currentY;
-        let initialX;
-        let initialY;
+        let currentX = 0;
+        let currentY = 0;
+        let initialX = 0;
+        let initialY = 0;
         let xOffset = 0;
         let yOffset = 0;
         
@@ -918,11 +914,10 @@ foreach ($rows as $r) {
         document.addEventListener('mouseup', dragEnd);
         
         function dragStart(e) {
-            initialX = e.clientX - xOffset;
-            initialY = e.clientY - yOffset;
-            
             if (e.target === header || header.contains(e.target)) {
                 isDragging = true;
+                initialX = e.clientX - xOffset;
+                initialY = e.clientY - yOffset;
             }
         }
         
@@ -949,7 +944,7 @@ foreach ($rows as $r) {
         function setTranslate(xPos, yPos, el) {
             el.style.transform = `translate3d(${xPos}px, ${yPos}px, 0)`;
         }
-    })();
+    });
 </script>
 
 <!-- Плавающая панель поиска -->
