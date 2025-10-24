@@ -1422,8 +1422,23 @@ else:
             <!-- Левая панель: Доступные рулоны -->
             <div style="flex: 1; border: 2px solid #e0e0e0; border-radius: 8px; padding: 15px; background: #f9f9f9;">
                 <h3 style="margin: 0 0 15px 0; font-size: 16px; color: #333;">Доступные рулоны</h3>
-                <div id="availableRolls" style="max-height: 500px; overflow-y: auto;">
+                
+                <!-- Фильтр по названию -->
+                <div style="margin-bottom: 15px;">
+                    <input type="text" 
+                           id="filterRollsInput" 
+                           placeholder="🔍 Поиск по названию фильтра..." 
+                           oninput="filterAvailableRolls()"
+                           style="width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; box-sizing: border-box;">
+                </div>
+                
+                <div id="availableRolls" style="max-height: 450px; overflow-y: auto;">
                     <!-- Рулоны будут добавлены через JavaScript -->
+                </div>
+                
+                <!-- Счётчик -->
+                <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #ddd; font-size: 12px; color: #666;">
+                    Показано: <span id="rollsShownCount">0</span> из <span id="rollsTotalCount">0</span>
                 </div>
             </div>
             
@@ -1531,23 +1546,52 @@ function initializeAvailableRolls() {
         selected: false
     }));
     
+    // Очищаем фильтр
+    const filterInput = document.getElementById('filterRollsInput');
+    if (filterInput) filterInput.value = '';
+    
+    renderAvailableRolls();
+}
+
+// Фильтрация рулонов по названию
+function filterAvailableRolls() {
     renderAvailableRolls();
 }
 
 // Отрисовка доступных рулонов
 function renderAvailableRolls() {
     const container = document.getElementById('availableRolls');
+    const filterInput = document.getElementById('filterRollsInput');
+    const filterText = filterInput ? filterInput.value.toLowerCase().trim() : '';
     
     if (availableRollsData.length === 0) {
         container.innerHTML = '<div style="text-align: center; color: #999; padding: 20px;">Нет доступных рулонов</div>';
+        document.getElementById('rollsShownCount').textContent = '0';
+        document.getElementById('rollsTotalCount').textContent = '0';
         return;
     }
     
-    container.innerHTML = availableRollsData.map(roll => `
+    // Фильтруем рулоны
+    const filteredRolls = availableRollsData.filter(roll => {
+        if (filterText === '') return true;
+        return roll.filter.toLowerCase().includes(filterText);
+    });
+    
+    // Обновляем счётчики
+    document.getElementById('rollsShownCount').textContent = filteredRolls.length;
+    document.getElementById('rollsTotalCount').textContent = availableRollsData.length;
+    
+    if (filteredRolls.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #999; padding: 20px;">Ничего не найдено</div>';
+        return;
+    }
+    
+    container.innerHTML = filteredRolls.map(roll => `
         <div style="background: white; border: 1px solid #ddd; border-radius: 4px; padding: 8px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; ${roll.used ? 'opacity: 0.5;' : ''}">
             <input type="checkbox" 
                    id="${roll.id}" 
                    ${roll.used ? 'disabled' : ''}
+                   ${currentBale.some(r => r.id === roll.id) ? 'checked' : ''}
                    onchange="toggleRollSelection('${roll.id}')"
                    style="cursor: pointer;">
             <label for="${roll.id}" style="flex: 1; cursor: pointer; font-size: 12px;">
