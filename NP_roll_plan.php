@@ -171,19 +171,27 @@ foreach ($rows as $r) {
             background:#fff; padding:12px; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,.06);
             display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-top:10px;
         }
-        label{ font-size:14px; color:#444; }
-        input[type="date"], input[type="number"]{
-            padding:6px 10px; border:1px solid #d1d5db; border-radius:8px; font-size:14px; background:#fff; outline:none;
+        label{ font-size:13px; color:#444; }
+        input[type="date"]{
+            padding:5px 8px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; background:#fff; outline:none;
+        }
+        input[type="number"]{
+            padding:5px 8px; border:1px solid #d1d5db; border-radius:6px; font-size:13px; background:#fff; outline:none;
+            width: 60px;
+        }
+        .btn-group{
+            display: flex;
+            gap: 6px;
+            margin-left: auto;
         }
         .btn{
-            background:#1a73e8; color:#fff; border:1px solid #1a73e8; border-radius:10px; padding:8px 14px;
-            font-size:14px; cursor:pointer; transition:.15s ease; font-weight:600;
+            background:#1a73e8; color:#fff; border:1px solid #1a73e8; border-radius:6px; padding:6px 12px;
+            font-size:12px; cursor:pointer; transition:.15s ease; font-weight:600; white-space: nowrap;
         }
         .btn:hover{ background:#1557b0; border-color:#1557b0; }
         .btn-complete{
-            background:#16a34a; color:#fff; border:1px solid #16a34a; border-radius:10px; padding:8px 14px;
-            font-size:14px; cursor:pointer; transition:.15s ease; font-weight:600;
-            margin-top: 10px;
+            background:#16a34a; color:#fff; border:1px solid #16a34a; border-radius:6px; padding:6px 12px;
+            font-size:12px; cursor:pointer; transition:.15s ease; font-weight:600; white-space: nowrap;
         }
         .btn-complete:hover{ background:#15803d; border-color:#15803d; }
 
@@ -370,13 +378,16 @@ foreach ($rows as $r) {
         <label>Дата начала: <input type="date" id="startDate" required></label>
         <label>Дней: <input type="number" id="daysCount" min="1" value="10" required></label>
         <button type="submit" class="btn">Построить</button>
-        <button type="button" class="btn" id="btnLoad">Загрузить сохранённый</button>
-        <button type="button" class="btn" id="btnSave">Сохранить план</button>
-        <?php if ($plan_ready): ?>
-            <button type="button" class="btn-complete" onclick="window.location.href='NP_cut_index.php'">
-                ✅ Завершить планирование
-            </button>
-        <?php endif; ?>
+        
+        <div class="btn-group">
+            <button type="button" class="btn" id="btnLoad">Загрузить</button>
+            <button type="button" class="btn" id="btnSave">Сохранить</button>
+            <?php if ($plan_ready): ?>
+                <button type="button" class="btn-complete" onclick="window.location.href='NP_cut_index.php'">
+                    ✅ Завершить
+                </button>
+            <?php endif; ?>
+        </div>
     </form>
 
     <?php if ($plan_ready): ?>
