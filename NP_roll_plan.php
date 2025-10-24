@@ -274,6 +274,8 @@ foreach ($rows as $r) {
             border-radius: 7px 7px 0 0;
             font-weight: 600;
             font-size: 12px;
+            cursor: move;
+            user-select: none;
         }
         
         .search-panel__input {
@@ -323,11 +325,33 @@ foreach ($rows as $r) {
             color: #333;
             margin-bottom: 2px;
             font-size: 11px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         
         .search-result-item__filters {
             font-size: 10px;
             color: #666;
+        }
+        
+        .bale-status {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 9px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .bale-status--planned {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .bale-status--not-planned {
+            background: #f8d7da;
+            color: #721c24;
         }
         
         .search-result-highlight {
@@ -584,6 +608,12 @@ foreach ($rows as $r) {
                     updateTotals();
                     updateHeightProgress();
                     updateLeftMarkers();
+                    
+                    // Обновляем результаты поиска если панель активна
+                    const searchInput = document.getElementById('filterSearchInput');
+                    if (searchInput && searchInput.value.trim() !== '') {
+                        searchFilterInBales();
+                    }
                 };
 
                 tr.appendChild(td);
@@ -785,6 +815,11 @@ foreach ($rows as $r) {
     
     // ==================== ПОИСК ФИЛЬТРОВ ====================
     
+    function isBalePlanned(baleId) {
+        // Проверяем, есть ли бухта в selected (распланирована)
+        return Object.values(selected).some(arr => arr && arr.includes(String(baleId)));
+    }
+    
     function searchFilterInBales() {
         const searchText = document.getElementById('filterSearchInput').value.toLowerCase().trim();
         const resultsContainer = document.getElementById('searchResults');
@@ -808,7 +843,8 @@ foreach ($rows as $r) {
                 results.push({
                     bale_id: bale.bale_id,
                     format: bale.format || '1000',
-                    filters: matchingFilters
+                    filters: matchingFilters,
+                    isPlanned: isBalePlanned(bale.bale_id)
                 });
             }
         });
@@ -828,10 +864,14 @@ foreach ($rows as $r) {
                 return highlighted;
             }).join(', ');
             
+            const statusClass = result.isPlanned ? 'bale-status--planned' : 'bale-status--not-planned';
+            const statusText = result.isPlanned ? 'План' : 'Нет';
+            
             return `
                 <div class="search-result-item" onclick="scrollToBale(${result.bale_id})">
                     <div class="search-result-item__bale">
-                        Бухта #${result.bale_id} [${result.format}]
+                        <span>Бухта #${result.bale_id} [${result.format}]</span>
+                        <span class="bale-status ${statusClass}">${statusText}</span>
                     </div>
                     <div class="search-result-item__filters">
                         ${filtersHtml}
@@ -858,6 +898,58 @@ foreach ($rows as $r) {
             }, 3000);
         }
     }
+    
+    // ==================== ПЕРЕТАСКИВАНИЕ ПАНЕЛИ ====================
+    
+    (function initDraggablePanel() {
+        const panel = document.querySelector('.search-panel');
+        const header = document.querySelector('.search-panel__header');
+        
+        let isDragging = false;
+        let currentX;
+        let currentY;
+        let initialX;
+        let initialY;
+        let xOffset = 0;
+        let yOffset = 0;
+        
+        header.addEventListener('mousedown', dragStart);
+        document.addEventListener('mousemove', drag);
+        document.addEventListener('mouseup', dragEnd);
+        
+        function dragStart(e) {
+            initialX = e.clientX - xOffset;
+            initialY = e.clientY - yOffset;
+            
+            if (e.target === header || header.contains(e.target)) {
+                isDragging = true;
+            }
+        }
+        
+        function drag(e) {
+            if (isDragging) {
+                e.preventDefault();
+                
+                currentX = e.clientX - initialX;
+                currentY = e.clientY - initialY;
+                
+                xOffset = currentX;
+                yOffset = currentY;
+                
+                setTranslate(currentX, currentY, panel);
+            }
+        }
+        
+        function dragEnd(e) {
+            initialX = currentX;
+            initialY = currentY;
+            isDragging = false;
+        }
+        
+        function setTranslate(xPos, yPos, el) {
+            el.style.transform = `translate3d(${xPos}px, ${yPos}px, 0)`;
+        }
+    })();
 </script>
 
 <!-- Плавающая панель поиска -->
