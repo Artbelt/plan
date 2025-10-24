@@ -79,6 +79,36 @@ if (isset($_GET['reset_format_199'])) {
     exit;
 }
 
+// Обработка сброса ручных бухт
+if (isset($_GET['reset_manual'])) {
+    unset($_SESSION['manual_bales']);
+    header("Location: ?order=" . urlencode($order));
+    exit;
+}
+
+// Обработка AJAX запроса на сохранение ручных бухт
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $json_input = file_get_contents('php://input');
+    $data = json_decode($json_input, true);
+    
+    if (isset($data['action']) && $data['action'] === 'save_manual_bales') {
+        $manual_bales = $data['bales'] ?? [];
+        
+        if (empty($manual_bales)) {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'error' => 'Нет бухт для сохранения']);
+            exit;
+        }
+        
+        // Сохраняем в сессию
+        $_SESSION['manual_bales'] = $manual_bales;
+        
+        header('Content-Type: application/json');
+        echo json_encode(['success' => true, 'count' => count($manual_bales)]);
+        exit;
+    }
+}
+
 // Обработка POST запроса от модального окна формата 199
 if (isset($_POST['format_199_submit'])) {
     $format_199_stock = (int)($_POST['format_199_stock'] ?? 0);
@@ -133,6 +163,19 @@ if (isset($_SESSION['format_199_assigned'])) {
 
 $rolls_1000 = [];
 $rolls_500 = [];
+
+// Загружаем ручные бухты из сессии
+$manual_bales = $_SESSION['manual_bales'] ?? [];
+
+// Подсчитываем использованные рулоны вручную
+$manual_rolls_used = [];
+foreach ($manual_bales as $bale) {
+    foreach ($bale as $roll) {
+        $key = $roll['filter'] . '_' . $roll['width'] . '_' . $roll['height'] . '_' . $roll['length'];
+        $manual_rolls_used[$key] = ($manual_rolls_used[$key] ?? 0) + 1;
+    }
+}
+
 function getPaperInfo($pdo, $filter) {
     $stmt = $pdo->prepare("SELECT paper_package FROM panel_filter_structure WHERE filter = ?");
     $stmt->execute([$filter]);
@@ -659,6 +702,24 @@ else:
     </div>
 <?php endif; ?>
 
+<!-- Кнопка для ручной упаковки бухт -->
+<div style="margin: 20px auto; text-align: center;">
+    <button type="button" onclick="openManualPackingModal()" 
+            style="padding: 12px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.3s;">
+        📦 Упаковать бухты вручную
+    </button>
+    <?php if (isset($_SESSION['manual_bales']) && !empty($_SESSION['manual_bales'])): ?>
+        <span style="margin-left: 10px; padding: 6px 12px; background: #4caf50; color: white; border-radius: 4px; font-size: 12px;">
+            ✓ Упаковано вручную: <?= count($_SESSION['manual_bales']) ?> бухт
+        </span>
+        <a href="?order=<?= urlencode($order) ?>&reset_manual=1" 
+           onclick="return confirm('Удалить все ручные бухты?')"
+           style="margin-left: 10px; padding: 6px 12px; background: #f44336; color: white; border-radius: 4px; font-size: 12px; text-decoration: none;">
+            Сбросить
+        </a>
+    <?php endif; ?>
+</div>
+
 <table>
     <tr>
         <th>Фильтр</th>
@@ -701,7 +762,15 @@ else:
         $full = floor($reels);
         $half = ($reels - $full) >= 0.49 ? 1 : 0;
 
-        for ($i = 0; $i < $full; $i++) {
+        // Подсчитываем, сколько рулонов уже использовано вручную
+        $key_1000 = $filter . '_' . $width . '_' . $height . '_1000';
+        $key_500 = $filter . '_' . $width . '_' . $height . '_500';
+        $manual_used_1000 = $manual_rolls_used[$key_1000] ?? 0;
+        $manual_used_500 = $manual_rolls_used[$key_500] ?? 0;
+
+        // Добавляем только те рулоны, которые не были использованы вручную
+        $rolls_to_add_1000 = max(0, $full - $manual_used_1000);
+        for ($i = 0; $i < $rolls_to_add_1000; $i++) {
             $rolls_1000[] = [
                 'filter' => $filter,
                 'paper' => $paper['p_p_name'],
@@ -712,7 +781,8 @@ else:
             ];
         }
 
-        if ($half) {
+        $rolls_to_add_500 = max(0, $half - $manual_used_500);
+        if ($rolls_to_add_500 > 0) {
             $rolls_500[] = [
                 'filter' => $filter,
                 'paper' => $paper['p_p_name'],
@@ -1305,9 +1375,17 @@ else:
         if (savedManualBales.length === 0 && bales.length === 0) return;
 
         const order = <?= json_encode($order) ?>;
+        
+        // Добавляем ручные бухты из сессии к автоматическим
+        const sessionManualBales = <?= json_encode($manual_bales) ?>;
+        const allBales = [
+            ...<?= json_encode(array_merge($bales, $bales_format199)) ?>,
+            ...sessionManualBales
+        ];
+        
         const payload = {
             order: order,
-            auto_bales: <?= json_encode(array_merge($bales, $bales_format199)) ?>,
+            auto_bales: allBales,
             manual_bales: savedManualBales
         };
 
@@ -1329,5 +1407,352 @@ else:
     }
 
 </script>
+
+<!-- Модальное окно для ручной упаковки бухт -->
+<div id="manualPackingModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1000; overflow: auto;">
+    <div style="background: white; margin: 20px auto; max-width: 1400px; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+        <!-- Заголовок -->
+        <div style="padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 12px 12px 0 0; display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="margin: 0; font-size: 20px;">📦 Ручная упаковка бухт</h2>
+            <button onclick="closeManualPackingModal()" style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 24px; cursor: pointer; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;">×</button>
+        </div>
+        
+        <!-- Основной контент -->
+        <div style="display: flex; gap: 20px; padding: 20px;">
+            <!-- Левая панель: Доступные рулоны -->
+            <div style="flex: 1; border: 2px solid #e0e0e0; border-radius: 8px; padding: 15px; background: #f9f9f9;">
+                <h3 style="margin: 0 0 15px 0; font-size: 16px; color: #333;">Доступные рулоны</h3>
+                <div id="availableRolls" style="max-height: 500px; overflow-y: auto;">
+                    <!-- Рулоны будут добавлены через JavaScript -->
+                </div>
+            </div>
+            
+            <!-- Центральная панель: Конструктор бухты -->
+            <div style="flex: 1; border: 2px solid #667eea; border-radius: 8px; padding: 15px; background: #f0f4ff;">
+                <h3 style="margin: 0 0 15px 0; font-size: 16px; color: #333;">Текущая бухта</h3>
+                
+                <!-- Визуализация бухты -->
+                <div style="position: relative; height: 60px; background: linear-gradient(to right, #e3f2fd 0%, #bbdefb 100%); border: 2px solid #2196f3; border-radius: 6px; margin-bottom: 15px;">
+                    <div id="baleVisualization" style="display: flex; height: 100%; align-items: center; padding: 0 10px; gap: 2px;">
+                        <!-- Рулоны в бухте -->
+                    </div>
+                    <div style="position: absolute; top: -20px; left: 0; font-size: 11px; color: #666;">0 мм</div>
+                    <div style="position: absolute; top: -20px; right: 0; font-size: 11px; color: #666;">1200 мм</div>
+                </div>
+                
+                <!-- Индикаторы -->
+                <div style="margin-bottom: 15px;">
+                    <div style="margin-bottom: 8px; font-size: 13px;">
+                        <strong>Заполнено:</strong> <span id="currentWidth" style="color: #2196f3; font-weight: bold;">0</span> / 1200 мм
+                    </div>
+                    <div style="margin-bottom: 8px; font-size: 13px;">
+                        <strong>Остаток:</strong> <span id="remainingWidth" style="font-weight: bold;">1200</span> мм
+                        <span id="wasteIndicator" style="margin-left: 10px; padding: 2px 8px; border-radius: 4px; font-size: 11px;"></span>
+                    </div>
+                    <div style="font-size: 13px;">
+                        <strong>Рулонов в бухте:</strong> <span id="rollCount" style="font-weight: bold;">0</span>
+                    </div>
+                </div>
+                
+                <!-- Список рулонов в текущей бухте -->
+                <div id="currentBaleRolls" style="max-height: 300px; overflow-y: auto; background: white; border: 1px solid #ddd; border-radius: 4px; padding: 10px; margin-bottom: 15px; min-height: 100px;">
+                    <div style="text-align: center; color: #999; padding: 20px;">Выберите рулоны из списка слева</div>
+                </div>
+                
+                <!-- Кнопки управления -->
+                <div style="display: flex; gap: 10px;">
+                    <button onclick="createBale()" id="createBaleBtn" disabled style="flex: 1; padding: 10px; background: #4caf50; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;">
+                        Создать бухту
+                    </button>
+                    <button onclick="clearCurrentBale()" style="padding: 10px 20px; background: #f44336; color: white; border: none; border-radius: 6px; cursor: pointer;">
+                        Очистить
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Правая панель: Созданные бухты -->
+            <div style="flex: 1; border: 2px solid #e0e0e0; border-radius: 8px; padding: 15px; background: #f9f9f9;">
+                <h3 style="margin: 0 0 15px 0; font-size: 16px; color: #333;">
+                    Созданные бухты вручную 
+                    <span id="manualBalesCount" style="background: #4caf50; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px;">0</span>
+                </h3>
+                <div id="createdBales" style="max-height: 500px; overflow-y: auto;">
+                    <div style="text-align: center; color: #999; padding: 40px 20px;">Пока нет созданных бухт</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Футер -->
+        <div style="padding: 15px 20px; background: #f5f5f5; border-radius: 0 0 12px 12px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 13px; color: #666;">
+                💡 Совет: остаток < 35мм считается хорошим, зазоры должны быть ≥ 5мм
+            </div>
+            <button onclick="saveManualBalesAndClose()" style="padding: 12px 24px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 14px;">
+                Сохранить и продолжить
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+// Глобальные переменные для ручной упаковки
+let availableRollsData = [];
+let currentBale = [];
+let manualBales = [];
+
+// Открыть модальное окно
+function openManualPackingModal() {
+    // Инициализация данных рулонов
+    initializeAvailableRolls();
+    
+    // Показываем модальное окно
+    document.getElementById('manualPackingModal').style.display = 'block';
+}
+
+// Закрыть модальное окно
+function closeManualPackingModal() {
+    if (manualBales.length > 0) {
+        if (!confirm('У вас есть несохраненные бухты. Закрыть окно без сохранения?')) {
+            return;
+        }
+    }
+    document.getElementById('manualPackingModal').style.display = 'none';
+}
+
+// Инициализация доступных рулонов
+function initializeAvailableRolls() {
+    // Получаем данные из PHP
+    const rolls1000 = <?= json_encode($rolls_1000 ?? []) ?>;
+    const rolls500 = <?= json_encode($rolls_500 ?? []) ?>;
+    
+    availableRollsData = [...rolls1000, ...rolls500].map((roll, idx) => ({
+        id: 'roll_' + idx,
+        ...roll,
+        selected: false
+    }));
+    
+    renderAvailableRolls();
+}
+
+// Отрисовка доступных рулонов
+function renderAvailableRolls() {
+    const container = document.getElementById('availableRolls');
+    
+    if (availableRollsData.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #999; padding: 20px;">Нет доступных рулонов</div>';
+        return;
+    }
+    
+    container.innerHTML = availableRollsData.map(roll => `
+        <div style="background: white; border: 1px solid #ddd; border-radius: 4px; padding: 8px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; ${roll.used ? 'opacity: 0.5;' : ''}">
+            <input type="checkbox" 
+                   id="${roll.id}" 
+                   ${roll.used ? 'disabled' : ''}
+                   onchange="toggleRollSelection('${roll.id}')"
+                   style="cursor: pointer;">
+            <label for="${roll.id}" style="flex: 1; cursor: pointer; font-size: 12px;">
+                <strong>${roll.filter}</strong><br>
+                <span style="color: #666;">${roll.width}×${roll.height}мм, ${roll.length}м</span>
+            </label>
+        </div>
+    `).join('');
+}
+
+// Переключение выбора рулона
+function toggleRollSelection(rollId) {
+    const roll = availableRollsData.find(r => r.id === rollId);
+    if (!roll || roll.used) return;
+    
+    const checkbox = document.getElementById(rollId);
+    
+    if (checkbox.checked) {
+        // Добавляем в текущую бухту
+        currentBale.push(roll);
+    } else {
+        // Убираем из текущей бухты
+        const idx = currentBale.findIndex(r => r.id === rollId);
+        if (idx > -1) currentBale.splice(idx, 1);
+    }
+    
+    updateCurrentBale();
+}
+
+// Обновление отображения текущей бухты
+function updateCurrentBale() {
+    const totalWidth = currentBale.reduce((sum, r) => sum + parseFloat(r.width), 0);
+    const remaining = 1200 - totalWidth;
+    
+    // Обновляем индикаторы
+    document.getElementById('currentWidth').textContent = totalWidth.toFixed(1);
+    document.getElementById('remainingWidth').textContent = remaining.toFixed(1);
+    document.getElementById('rollCount').textContent = currentBale.length;
+    
+    // Индикатор отходов
+    const wasteIndicator = document.getElementById('wasteIndicator');
+    if (totalWidth > 1200) {
+        wasteIndicator.textContent = '❌ Переполнение!';
+        wasteIndicator.style.background = '#f44336';
+        wasteIndicator.style.color = 'white';
+        document.getElementById('createBaleBtn').disabled = true;
+    } else if (remaining < 5 && currentBale.length > 0) {
+        wasteIndicator.textContent = '⚠️ Зазор < 5мм';
+        wasteIndicator.style.background = '#ff9800';
+        wasteIndicator.style.color = 'white';
+        document.getElementById('createBaleBtn').disabled = true;
+    } else if (remaining <= 35 && currentBale.length > 0) {
+        wasteIndicator.textContent = '✓ Хорошо';
+        wasteIndicator.style.background = '#4caf50';
+        wasteIndicator.style.color = 'white';
+        document.getElementById('createBaleBtn').disabled = false;
+    } else if (currentBale.length > 0) {
+        wasteIndicator.textContent = '⚠️ Большой остаток';
+        wasteIndicator.style.background = '#ff9800';
+        wasteIndicator.style.color = 'white';
+        document.getElementById('createBaleBtn').disabled = false;
+    } else {
+        wasteIndicator.textContent = '';
+        document.getElementById('createBaleBtn').disabled = true;
+    }
+    
+    // Визуализация
+    const visualization = document.getElementById('baleVisualization');
+    visualization.innerHTML = currentBale.map(roll => `
+        <div style="height: 100%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 4px; display: flex; align-items: center; justify-content: center; color: white; font-size: 10px; font-weight: bold; flex: 0 0 ${(roll.width / 1200 * 100).toFixed(1)}%;" title="${roll.filter}: ${roll.width}мм">
+            ${roll.width}
+        </div>
+    `).join('');
+    
+    // Список рулонов
+    const rollsList = document.getElementById('currentBaleRolls');
+    if (currentBale.length === 0) {
+        rollsList.innerHTML = '<div style="text-align: center; color: #999; padding: 20px;">Выберите рулоны из списка слева</div>';
+    } else {
+        rollsList.innerHTML = currentBale.map((roll, idx) => `
+            <div style="padding: 6px; border-bottom: 1px solid #eee; font-size: 12px;">
+                ${idx + 1}. <strong>${roll.filter}</strong> - ${roll.width}×${roll.height}мм, ${roll.length}м
+            </div>
+        `).join('');
+    }
+}
+
+// Создать бухту
+function createBale() {
+    if (currentBale.length === 0) return;
+    
+    const totalWidth = currentBale.reduce((sum, r) => sum + parseFloat(r.width), 0);
+    if (totalWidth > 1200) {
+        alert('Бухта переполнена! Уменьшите количество рулонов.');
+        return;
+    }
+    
+    // Добавляем в список созданных бухт
+    manualBales.push([...currentBale]);
+    
+    // Отмечаем рулоны как использованные
+    currentBale.forEach(roll => {
+        roll.used = true;
+        const checkbox = document.getElementById(roll.id);
+        if (checkbox) checkbox.checked = false;
+    });
+    
+    // Очищаем текущую бухту
+    currentBale = [];
+    
+    // Обновляем интерфейс
+    renderAvailableRolls();
+    updateCurrentBale();
+    renderCreatedBales();
+}
+
+// Очистить текущую бухту
+function clearCurrentBale() {
+    currentBale.forEach(roll => {
+        const checkbox = document.getElementById(roll.id);
+        if (checkbox) checkbox.checked = false;
+    });
+    currentBale = [];
+    updateCurrentBale();
+}
+
+// Отрисовка созданных бухт
+function renderCreatedBales() {
+    const container = document.getElementById('createdBales');
+    document.getElementById('manualBalesCount').textContent = manualBales.length;
+    
+    if (manualBales.length === 0) {
+        container.innerHTML = '<div style="text-align: center; color: #999; padding: 40px 20px;">Пока нет созданных бухт</div>';
+        return;
+    }
+    
+    container.innerHTML = manualBales.map((bale, baleIdx) => {
+        const totalWidth = bale.reduce((sum, r) => sum + parseFloat(r.width), 0);
+        const waste = 1200 - totalWidth;
+        
+        return `
+            <div style="background: white; border: 1px solid #ddd; border-radius: 6px; padding: 12px; margin-bottom: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <strong style="font-size: 13px;">Бухта #${baleIdx + 1}</strong>
+                    <button onclick="deleteBale(${baleIdx})" style="background: #f44336; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;">Удалить</button>
+                </div>
+                <div style="font-size: 11px; color: #666; margin-bottom: 6px;">
+                    Рулонов: ${bale.length} | Ширина: ${totalWidth.toFixed(1)}мм | Остаток: ${waste.toFixed(1)}мм
+                </div>
+                <div style="font-size: 11px;">
+                    ${bale.map(r => r.filter + ' (' + r.width + 'мм)').join(', ')}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Удалить бухту
+function deleteBale(baleIdx) {
+    const bale = manualBales[baleIdx];
+    
+    // Освобождаем рулоны
+    bale.forEach(roll => {
+        roll.used = false;
+    });
+    
+    // Удаляем бухту
+    manualBales.splice(baleIdx, 1);
+    
+    // Обновляем интерфейс
+    renderAvailableRolls();
+    renderCreatedBales();
+}
+
+// Сохранить и закрыть
+function saveManualBalesAndClose() {
+    if (manualBales.length === 0) {
+        alert('Вы не создали ни одной бухты.');
+        return;
+    }
+    
+    // Отправляем данные на сервер через AJAX
+    fetch('?order=<?= urlencode($order) ?>', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            action: 'save_manual_bales',
+            bales: manualBales
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            alert('Ручные бухты сохранены! Страница будет перезагружена.');
+            window.location.reload();
+        } else {
+            alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert('Ошибка при сохранении');
+    });
+}
+</script>
+
 </body>
 </html>
