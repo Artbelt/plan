@@ -242,9 +242,6 @@ foreach ($rows as $r) {
         /* ВЫДЕЛЕНИЕ названия запланированных бухт */
         .bale-name.bale-picked{background:#fff7cc !important;color:#e65100 !important;padding:2px 6px;border-radius:4px;border:1px solid #f59e0b}
 
-        .hscroll{ margin-top:10px; height:18px; border:1px solid #e5e7eb; background:#fff; border-radius:8px; overflow-x:auto; overflow-y:hidden; box-shadow:0 1px 4px rgba(0,0,0,.04); }
-        .hscroll-inner{ height:1px; }
-
         @media (max-width:768px){
             form{ flex-direction:column; align-items:flex-start; }
             thead th:first-child, tbody td:first-child, tfoot td:first-child{ min-width:140px; }
@@ -375,17 +372,17 @@ foreach ($rows as $r) {
         <button type="submit" class="btn">Построить</button>
         <button type="button" class="btn" id="btnLoad">Загрузить сохранённый</button>
         <button type="button" class="btn" id="btnSave">Сохранить план</button>
-    </form>
-
-    <?php if ($plan_ready): ?>
-        <div style="text-align: center; margin-top: 15px;">
+        <?php if ($plan_ready): ?>
             <button type="button" class="btn-complete" onclick="window.location.href='NP_cut_index.php'">
                 ✅ Завершить планирование
             </button>
-            <p style="font-size: 12px; color: #666; margin-top: 5px;">
-                План сохранён. Переход к планированию гофрирования.
-            </p>
-        </div>
+        <?php endif; ?>
+    </form>
+
+    <?php if ($plan_ready): ?>
+        <p style="font-size: 12px; color: #666; margin-top: 5px; text-align: center;">
+            План сохранён. Переход к планированию гофрирования.
+        </p>
     <?php endif; ?>
 
     <div id="heightBarWrap" style="display:none">
@@ -394,11 +391,6 @@ foreach ($rows as $r) {
     </div>
 
     <div id="planArea"></div>
-
-    <!-- Нижний бегунок -->
-    <div id="hScroll" class="hscroll" aria-label="Горизонтальная прокрутка">
-        <div class="hscroll-inner"></div>
-    </div>
 </div>
 
 <script>
@@ -633,9 +625,6 @@ foreach ($rows as $r) {
 
         container.appendChild(table);
 
-        // Нижний бегунок
-        setupBottomScrollbar(container, table);
-
         updateTotals();
         updateHeightHighlights();
         updateHeightProgress();
@@ -648,25 +637,6 @@ foreach ($rows as $r) {
         }catch(e){
             console.warn('План не загружен:', e);
         }
-    }
-
-    function setupBottomScrollbar(container, table) {
-        const bar   = document.getElementById('hScroll');
-        const inner = bar.querySelector('.hscroll-inner');
-
-        const syncWidth = ()=> { inner.style.width = table.scrollWidth + 'px'; };
-        syncWidth();
-
-        if (window.ResizeObserver) {
-            const ro = new ResizeObserver(syncWidth);
-            ro.observe(table);
-        } else {
-            window.addEventListener('resize', syncWidth);
-        }
-
-        let lock = false;
-        bar.addEventListener('scroll', ()=>{ if(lock) return; lock = true; container.scrollLeft = bar.scrollLeft; lock = false; });
-        container.addEventListener('scroll', ()=>{ if(lock) return; lock = true; bar.scrollLeft = container.scrollLeft; lock = false; });
     }
 
     function updateTotals() {
@@ -709,32 +679,11 @@ foreach ($rows as $r) {
             if (!data.ok) throw new Error(data.error || 'save failed');
             alert('План сохранён');
             
-            // Показываем кнопку "Завершить" после сохранения
-            showCompleteButton();
+            // Перезагружаем страницу чтобы показать кнопку "Завершить"
+            location.reload();
         }catch(e){
             alert('Ошибка сохранения: ' + e.message);
         }
-    }
-
-    function showCompleteButton(){
-        // Проверяем, не добавлена ли уже кнопка
-        if (document.getElementById('completeButton')) return;
-        
-        const completeDiv = document.createElement('div');
-        completeDiv.id = 'completeButton';
-        completeDiv.style.cssText = 'text-align: center; margin-top: 15px;';
-        completeDiv.innerHTML = `
-            <button type="button" class="btn-complete" onclick="window.location.href='NP_cut_index.php'">
-                ✅ Завершить планирование
-            </button>
-            <p style="font-size: 12px; color: #666; margin-top: 5px;">
-                План сохранён. Переход к планированию гофрирования.
-            </p>
-        `;
-        
-        // Вставляем кнопку после формы
-        const form = document.querySelector('form');
-        form.parentNode.insertBefore(completeDiv, form.nextSibling);
     }
 
     async function loadSavedPlan(){
