@@ -214,6 +214,7 @@ foreach ($existing_plan as $row) {
     <button type="button" onclick="removeDay()">Убрать день</button>
     <button type="button" onclick="reloadPlan()" style="background:#16a34a; color:#fff; padding:5px 10px; border:1px solid #16a34a; border-radius:4px; cursor:pointer;">Загрузить план</button>
     <button type="button" onclick="savePlan()" style="background:#2563eb; color:#fff; padding:5px 10px; border:1px solid #2563eb; border-radius:4px; cursor:pointer;">Сохранить план</button>
+    <button type="button" onclick="completePlanning()" style="background:#059669; color:#fff; padding:5px 10px; border:1px solid #059669; border-radius:4px; cursor:pointer; font-weight:600;">Завершить</button>
     <button type="button" onclick="clearPage()" style="background:#dc2626; color:#fff; padding:5px 10px; border:1px solid #dc2626; border-radius:4px; cursor:pointer;">Очистить страницу</button>
 </form>
 </div>
@@ -713,13 +714,36 @@ foreach ($existing_plan as $row) {
     
     window.reloadPlan = reloadPlan;
     
-    // Функция для сохранения плана
-    function savePlan() {
+    // Функция для сохранения плана (остаёмся на странице)
+    async function savePlan() {
+        preparePlan();
+        const formData = new FormData(document.getElementById('save-form'));
+        
+        try {
+            const response = await fetch('NP/save_build_plan.php?stay=1', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (response.ok) {
+                alert('✓ План успешно сохранён!');
+            } else {
+                alert('✗ Ошибка при сохранении плана');
+            }
+        } catch (error) {
+            alert('✗ Ошибка: ' + error.message);
+        }
+    }
+    
+    // Функция для завершения планирования (сохранить и перейти на главную)
+    function completePlanning() {
+        if (!confirm('Завершить планирование?\nПлан будет сохранён и вы вернётесь на главную страницу.')) return;
         preparePlan();
         document.getElementById('save-form').submit();
     }
     
     window.savePlan = savePlan;
+    window.completePlanning = completePlanning;
     
     // Функция для очистки страницы (перезагрузка без загрузки плана)
     function clearPage() {

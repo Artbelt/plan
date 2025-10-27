@@ -34,6 +34,13 @@ foreach ($data as $date => $places) {
 // Отметим как готовое
 $pdo->prepare("UPDATE orders SET build_ready = 1 WHERE order_number = ?")->execute([$order]);
 
-// Вернёмся на главную
+// Если параметр stay=1, просто возвращаем успех (для AJAX)
+if (isset($_GET['stay']) && $_GET['stay'] == '1') {
+    http_response_code(200);
+    echo json_encode(['ok' => true, 'message' => 'План сохранён']);
+    exit;
+}
+
+// Иначе вернёмся на главную
 header("Location: ../NP_cut_index.php");
 exit;
