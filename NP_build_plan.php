@@ -3,6 +3,7 @@ $pdo = new PDO("mysql:host=127.0.0.1;dbname=plan;charset=utf8mb4", "root", "");
 $order = $_GET['order'] ?? '';
 $days = intval($_GET['days'] ?? 9);
 $start = $_GET['start'] ?? date('Y-m-d');
+$fills_per_day = intval($_GET['fills_per_day'] ?? 50);
 
 $start_date = new DateTime($start);
 $dates = [];
@@ -22,6 +23,24 @@ foreach ($positions as $p) {
         'label'   => $p['filter_label'],
         'tooltip' => $tooltip,
         'count'   => $p['count']
+    ];
+}
+
+// Загрузка существующего плана сборки
+$stmt = $pdo->prepare("SELECT assign_date, place, filter_label, count FROM build_plan WHERE order_number = ? ORDER BY assign_date, place");
+$stmt->execute([$order]);
+$existing_plan = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$plan_data = [];
+foreach ($existing_plan as $row) {
+    if (!isset($plan_data[$row['assign_date']])) {
+        $plan_data[$row['assign_date']] = [];
+    }
+    if (!isset($plan_data[$row['assign_date']][$row['place']])) {
+        $plan_data[$row['assign_date']][$row['place']] = [];
+    }
+    $plan_data[$row['assign_date']][$row['place']][] = [
+        'filter' => $row['filter_label'],
+        'count' => $row['count']
     ];
 }
 ?>
@@ -92,13 +111,14 @@ foreach ($positions as $p) {
 <form method="get" style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
     Дата начала: <input type="date" name="start" value="<?= htmlspecialchars($_GET['start'] ?? date('Y-m-d')) ?>">
     Дней: <input type="number" name="days" value="<?= $days ?>" min="1" max="90">
+    Заливок в смену: <input type="number" name="fills_per_day" id="fills_per_day" value="<?= $fills_per_day ?>" min="1" style="width:60px;">
     <input type="hidden" name="order" value="<?= htmlspecialchars($order) ?>">
     <button type="submit">Построить таблицу</button>
     <button type="button" onclick="addDay()">Добавить день</button>
     <button type="button" onclick="removeDay()">Убрать день</button>
+    <button type="button" onclick="reloadPlan()" style="background:#16a34a; color:#fff; padding:5px 10px; border:1px solid #16a34a; border-radius:4px; cursor:pointer;">Загрузить план</button>
+    <button type="button" onclick="savePlan()" style="background:#2563eb; color:#fff; padding:5px 10px; border:1px solid #2563eb; border-radius:4px; cursor:pointer;">Сохранить план</button>
 </form>
-
-<label>Заливок в смену: <input type="number" id="fills_per_day" value="50" min="1" style="width:60px;"></label>
 
 <h3>Доступные позиции из гофроплана</h3>
 <table id="top-table">
@@ -130,37 +150,35 @@ foreach ($positions as $p) {
 </table>
 
 <h3>Планирование сборки</h3>
-<form method="post" action="NP/save_build_plan.php">
+<form method="post" action="NP/save_build_plan.php" id="save-form">
     <input type="hidden" name="order" value="<?= htmlspecialchars($order) ?>">
-
-    <div class="table-wrap">
-        <table id="bottom-table">
-            <thead>
-            <tr>
-                <th class="sticky-left">Место</th>
-                <?php foreach ($dates as $d): ?>
-                    <th class="date-col"><?= $d ?></th>
-                <?php endforeach; ?>
-                <th class="sticky-right" id="right-sticky-header">Место</th>
-            </tr>
-            </thead>
-            <tbody>
-            <?php for ($place = 1; $place <= 17; $place++): ?>
-                <tr>
-                    <td class="sticky-left"><?= $place ?></td>
-                    <?php foreach ($dates as $d): ?>
-                        <td class="drop-target date-col" data-date="<?= $d ?>" data-place="<?= $place ?>"></td>
-                    <?php endforeach; ?>
-                    <td class="sticky-right"><?= $place ?></td>
-                </tr>
-            <?php endfor; ?>
-            </tbody>
-        </table>
-    </div>
-
     <input type="hidden" name="plan_data" id="plan_data">
-    <button type="submit" onclick="preparePlan()">Сохранить план</button>
 </form>
+
+<div class="table-wrap">
+    <table id="bottom-table">
+        <thead>
+        <tr>
+            <th class="sticky-left">Место</th>
+            <?php foreach ($dates as $d): ?>
+                <th class="date-col"><?= $d ?></th>
+            <?php endforeach; ?>
+            <th class="sticky-right" id="right-sticky-header">Место</th>
+        </tr>
+        </thead>
+        <tbody>
+        <?php for ($place = 1; $place <= 17; $place++): ?>
+            <tr>
+                <td class="sticky-left"><?= $place ?></td>
+                <?php foreach ($dates as $d): ?>
+                    <td class="drop-target date-col" data-date="<?= $d ?>" data-place="<?= $place ?>"></td>
+                <?php endforeach; ?>
+                <td class="sticky-right"><?= $place ?></td>
+            </tr>
+        <?php endfor; ?>
+        </tbody>
+    </table>
+</div>
 
 <div class="modal" id="modal">
     <div class="modal-content">
@@ -285,8 +303,13 @@ foreach ($positions as $p) {
                     const countMatch = item.title.match(/\((\d+)\)/);
                     if (countMatch) alreadyInCell += parseInt(countMatch[1]);
                 });
+                // Вычисляем свободное место: fillsPerDay минус уже занятое
                 let freeSpace = fillsPerDay - alreadyInCell;
-                if (freeSpace <= 0) { dateIndex++; continue; }
+                if (freeSpace <= 0) { 
+                    dateIndex++; 
+                    continue; 
+                }
+                // Добавляем столько, сколько помещается в свободное место
                 const batch = Math.min(total, freeSpace);
                 const div = document.createElement('div');
                 const filterName = selectedLabel.split('[')[0].trim();
@@ -431,6 +454,94 @@ foreach ($positions as $p) {
     addTableHoverEffect();
     window.addDay = addDay;
     window.removeDay = removeDay;
+
+    // Загрузка существующего плана
+    function loadExistingPlan() {
+        const planData = <?= json_encode($plan_data) ?>;
+        const corrPlanData = <?= json_encode($by_date) ?>;
+        
+        // Создаем маппинг filter -> full label из corrugation_plan
+        const filterToLabel = {};
+        Object.values(corrPlanData).forEach(dateItems => {
+            dateItems.forEach(item => {
+                const filterName = item.label.split('[')[0].trim();
+                filterToLabel[filterName] = item.label;
+            });
+        });
+        
+        // Проходим по всему плану и размещаем элементы
+        Object.keys(planData).forEach(date => {
+            Object.keys(planData[date]).forEach(place => {
+                const td = document.querySelector(`.drop-target[data-date='${date}'][data-place='${place}']`);
+                if (!td) return;
+                
+                planData[date][place].forEach(item => {
+                    const filterName = item.filter;
+                    const count = item.count;
+                    const fullLabel = filterToLabel[filterName] || filterName;
+                    
+                    const div = document.createElement('div');
+                    div.innerText = filterName;
+                    div.title = `${filterName} (${count})`;
+                    div.classList.add('assigned-item');
+                    div.setAttribute('data-label', fullLabel);
+                    div.setAttribute('data-id', 'loaded_' + Math.random().toString(36).substr(2, 9));
+                    
+                    if (td.querySelector('.assigned-item')) {
+                        div.classList.add('half-width');
+                        td.querySelector('.assigned-item').classList.add('half-width');
+                    }
+                    
+                    td.appendChild(div);
+                });
+            });
+        });
+        
+        // Помечаем использованные позиции в верхней таблице
+        document.querySelectorAll('.assigned-item').forEach(assignedItem => {
+            const label = assignedItem.dataset.label;
+            const posCell = Array.from(document.querySelectorAll('.position-cell')).find(cell => 
+                cell.dataset.label === label && !cell.classList.contains('used')
+            );
+            if (posCell) {
+                posCell.classList.add('used');
+            }
+        });
+        
+        attachRemoveHandlers();
+    }
+    
+    // Загружаем план при загрузке страницы
+    if (Object.keys(<?= json_encode($plan_data) ?>).length > 0) {
+        loadExistingPlan();
+    }
+    
+    // Функция для перезагрузки плана (очистить и загрузить заново)
+    function reloadPlan() {
+        // Очищаем все назначенные элементы
+        document.querySelectorAll('.assigned-item').forEach(item => item.remove());
+        
+        // Убираем пометки "used" с верхней таблицы
+        document.querySelectorAll('.position-cell.used').forEach(cell => cell.classList.remove('used'));
+        
+        // Загружаем план заново
+        if (Object.keys(<?= json_encode($plan_data) ?>).length > 0) {
+            loadExistingPlan();
+            alert('План загружен из базы данных');
+        } else {
+            alert('Сохраненный план не найден');
+        }
+    }
+    
+    window.reloadPlan = reloadPlan;
+    
+    // Функция для сохранения плана
+    function savePlan() {
+        preparePlan();
+        document.getElementById('save-form').submit();
+    }
+    
+    window.savePlan = savePlan;
 </script>
 </body>
 </html>
