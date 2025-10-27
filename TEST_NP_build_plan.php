@@ -618,7 +618,40 @@ foreach ($existing_plan as $row) {
             });
         });
         
-        // Проходим по всему плану и размещаем элементы
+        // ШАГ 1: Собираем суммы по позициям из build_plan
+        const positionSums = {}; // { "AF1860 [40] 177": 346 }
+        
+        Object.keys(planData).forEach(date => {
+            Object.keys(planData[date]).forEach(place => {
+                planData[date][place].forEach(item => {
+                    const filterName = item.filter;
+                    const fullLabel = filterToLabel[filterName] || filterName;
+                    const count = parseInt(item.count);
+                    positionSums[fullLabel] = (positionSums[fullLabel] || 0) + count;
+                });
+            });
+        });
+        
+        // ШАГ 2: Для каждой уникальной позиции ищем в верхней таблице и закрашиваем
+        Object.keys(positionSums).forEach(label => {
+            const totalCount = positionSums[label];
+            
+            // Ищем ячейку в верхней таблице с этой меткой и суммарным количеством
+            const posCell = Array.from(document.querySelectorAll('.position-cell')).find(cell => 
+                cell.dataset.label === label && 
+                parseInt(cell.dataset.count) === totalCount &&
+                !cell.classList.contains('used')
+            );
+            
+            if (posCell) {
+                posCell.classList.add('used');
+                console.log(`Закрашена позиция: ${label}, количество: ${totalCount}`);
+            } else {
+                console.warn(`Позиция "${label}" с количеством ${totalCount} не найдена в верхней таблице`);
+            }
+        });
+        
+        // ШАГ 3: Отрисовываем элементы в нижней таблице
         Object.keys(planData).forEach(date => {
             Object.keys(planData[date]).forEach(place => {
                 const td = document.querySelector(`.drop-target[data-date='${date}'][data-place='${place}']`);
@@ -629,12 +662,12 @@ foreach ($existing_plan as $row) {
                     const count = item.count;
                     const fullLabel = filterToLabel[filterName] || filterName;
                     
-                    // ИСПРАВЛЕНО: Находим соответствующую позицию в верхней таблице и используем ее data-id
+                    // Находим соответствующую позицию в верхней таблице для связи data-id
                     const posCell = Array.from(document.querySelectorAll('.position-cell')).find(cell => 
-                        cell.dataset.label === fullLabel && !cell.classList.contains('used')
+                        cell.dataset.label === fullLabel && cell.classList.contains('used')
                     );
                     
-                    // Пропускаем позиции, которых нет в верхней таблице (вне диапазона дат)
+                    // Если позиции нет в верхней таблице - пропускаем
                     if (!posCell) {
                         console.warn(`Позиция "${fullLabel}" из build_plan не найдена в верхней таблице - пропускаем`);
                         return;
@@ -666,9 +699,6 @@ foreach ($existing_plan as $row) {
                     }
                     
                     td.appendChild(div);
-                    
-                    // Помечаем позицию как использованную
-                    posCell.classList.add('used');
                 });
             });
         });
