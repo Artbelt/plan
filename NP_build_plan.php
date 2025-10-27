@@ -615,6 +615,12 @@ foreach ($existing_plan as $row) {
                         cell.dataset.label === fullLabel && !cell.classList.contains('used')
                     );
                     
+                    // Пропускаем позиции, которых нет в верхней таблице (вне диапазона дат)
+                    if (!posCell) {
+                        console.warn(`Позиция "${fullLabel}" из build_plan не найдена в верхней таблице - пропускаем`);
+                        return;
+                    }
+                    
                     const div = document.createElement('div');
                     // Определяем отображаемое название
                     let displayName = '';
@@ -632,8 +638,8 @@ foreach ($existing_plan as $row) {
                     div.classList.add('assigned-item');
                     div.setAttribute('data-label', fullLabel);
                     div.setAttribute('data-count', count);
-                    // Используем data-id из верхней таблицы, если нашли позицию
-                    div.setAttribute('data-id', posCell ? posCell.dataset.id : 'loaded_' + Math.random().toString(36).substr(2, 9));
+                    // Используем data-id из верхней таблицы
+                    div.setAttribute('data-id', posCell.dataset.id);
                     
                     if (td.querySelector('.assigned-item')) {
                         div.classList.add('half-width');
@@ -643,9 +649,7 @@ foreach ($existing_plan as $row) {
                     td.appendChild(div);
                     
                     // Помечаем позицию как использованную
-                    if (posCell) {
-                        posCell.classList.add('used');
-                    }
+                    posCell.classList.add('used');
                 });
             });
         });
