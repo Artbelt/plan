@@ -12,9 +12,12 @@ for ($i = 0; $i < $days; $i++) {
     $start_date->modify('+1 day');
 }
 
-// Получение позиций из гофроплана (включаем count)
-$stmt = $pdo->prepare("SELECT plan_date, filter_label, count FROM corrugation_plan WHERE order_number = ?");
-$stmt->execute([$order]);
+// Вычисляем конечную дату диапазона
+$end_date = (new DateTime($start))->modify('+' . ($days - 1) . ' days')->format('Y-m-d');
+
+// Получение позиций из гофроплана только в пределах выбранного диапазона дат
+$stmt = $pdo->prepare("SELECT plan_date, filter_label, count FROM corrugation_plan WHERE order_number = ? AND plan_date >= ? AND plan_date <= ?");
+$stmt->execute([$order, $start, $end_date]);
 $positions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $by_date = [];
 foreach ($positions as $p) {
