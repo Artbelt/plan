@@ -455,8 +455,7 @@ foreach ($existing_plan as $row) {
             if (td) {
                 let alreadyInCell = 0;
                 td.querySelectorAll('.assigned-item').forEach(item => {
-                    const countMatch = item.title.match(/\((\d+)\)/);
-                    if (countMatch) alreadyInCell += parseInt(countMatch[1]);
+                    alreadyInCell += parseInt(item.dataset.count || 0);
                 });
                 // Вычисляем свободное место: fillsPerDay минус уже занятое
                 let freeSpace = fillsPerDay - alreadyInCell;
@@ -464,7 +463,7 @@ foreach ($existing_plan as $row) {
                     dateIndex++; 
                     continue; 
                 }
-                // Добавляем столько, сколько помещается в свободное место
+                // Добавляем ровно столько, чтобы заполнить до fillsPerDay (или весь остаток, если он меньше)
                 const batch = Math.min(total, freeSpace);
                 const div = document.createElement('div');
                 // Определяем отображаемое название
