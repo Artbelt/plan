@@ -48,7 +48,7 @@ foreach ($existing_plan as $row) {
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Планирование сборки</title>
+    <title>TEST Планирование сборки</title>
     <style>
         body { font-family: sans-serif; font-size: 12px; padding: 0; margin: 0; background: #f0f0f0; }
         
@@ -66,10 +66,9 @@ foreach ($existing_plan as $row) {
         
         /* Контент с отступом сверху */
         .content {
-            margin-top: 150px;
+            margin-top: 180px;
             padding: 0 20px 20px 20px;
         }
-        
         table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
         th, td { font-size: 10px; border: 1px solid #ccc; padding: 2px; vertical-align: top; white-space: normal; background: #fff; }
         th { background: #fafafa; }
@@ -194,23 +193,35 @@ foreach ($existing_plan as $row) {
             border-radius: 8px;
             max-height: calc(90vh - 40px);
         }
+        
+        .test-notice {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
 <div class="fixed-header">
+    <div class="test-notice">⚠️ ТЕСТОВАЯ ВЕРСИЯ - Исправлена проблема с удалением позиций</div>
+    
     <h2 style="margin: 10px 0;">Планирование сборки для заявки <?= htmlspecialchars($order) ?></h2>
-<form method="get" style="display:flex; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
-    Дата начала: <input type="date" name="start" value="<?= htmlspecialchars($_GET['start'] ?? date('Y-m-d')) ?>">
-    Дней: <input type="number" name="days" value="<?= $days ?>" min="1" max="90">
-    Заливок в смену: <input type="number" name="fills_per_day" id="fills_per_day" value="<?= $fills_per_day ?>" min="1" style="width:60px;">
-    <input type="hidden" name="order" value="<?= htmlspecialchars($order) ?>">
-    <button type="submit">Построить таблицу</button>
-    <button type="button" onclick="addDay()">Добавить день</button>
-    <button type="button" onclick="removeDay()">Убрать день</button>
-    <button type="button" onclick="reloadPlan()" style="background:#16a34a; color:#fff; padding:5px 10px; border:1px solid #16a34a; border-radius:4px; cursor:pointer;">Загрузить план</button>
-    <button type="button" onclick="savePlan()" style="background:#2563eb; color:#fff; padding:5px 10px; border:1px solid #2563eb; border-radius:4px; cursor:pointer;">Сохранить план</button>
-    <button type="button" onclick="clearPage()" style="background:#dc2626; color:#fff; padding:5px 10px; border:1px solid #dc2626; border-radius:4px; cursor:pointer;">Очистить страницу</button>
-</form>
+    <form method="get" style="display:flex; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap;">
+        Дата начала: <input type="date" name="start" value="<?= htmlspecialchars($_GET['start'] ?? date('Y-m-d')) ?>">
+        Дней: <input type="number" name="days" value="<?= $days ?>" min="1" max="90">
+        Заливок в смену: <input type="number" name="fills_per_day" id="fills_per_day" value="<?= $fills_per_day ?>" min="1" style="width:60px;">
+        <input type="hidden" name="order" value="<?= htmlspecialchars($order) ?>">
+        <button type="submit">Построить таблицу</button>
+        <button type="button" onclick="addDay()">Добавить день</button>
+        <button type="button" onclick="removeDay()">Убрать день</button>
+        <button type="button" onclick="reloadPlan()" style="background:#16a34a; color:#fff; padding:5px 10px; border:1px solid #16a34a; border-radius:4px; cursor:pointer;">Загрузить план</button>
+        <button type="button" onclick="savePlan()" style="background:#2563eb; color:#fff; padding:5px 10px; border:1px solid #2563eb; border-radius:4px; cursor:pointer;">Сохранить план</button>
+        <button type="button" onclick="clearPage()" style="background:#dc2626; color:#fff; padding:5px 10px; border:1px solid #dc2626; border-radius:4px; cursor:pointer;">Очистить страницу</button>
+    </form>
 </div>
 
 <div class="content">
@@ -310,15 +321,22 @@ foreach ($existing_plan as $row) {
         document.getElementById("modal-places").innerHTML = "";
     }
 
-    // Функция проверки, есть ли еще элементы с этим data-id в нижней таблице
+    // ИСПРАВЛЕНО: Функция проверки, есть ли еще элементы с этим data-id в нижней таблице
     function checkIfPositionFullyRemoved(posId) {
+        console.log('Checking position:', posId);
         const remainingItems = document.querySelectorAll(`.assigned-item[data-id='${posId}']`);
+        console.log('Remaining items:', remainingItems.length);
+        
         if (remainingItems.length === 0) {
             // Если больше нет элементов с этим data-id, убираем "used" из верхней таблицы
             const upperCell = document.querySelector(`.position-cell[data-id='${posId}']`);
+            console.log('Upper cell found:', upperCell);
             if (upperCell) {
                 upperCell.classList.remove('used');
+                console.log('✓ Position is now available again');
             }
+        } else {
+            console.log('Position still has', remainingItems.length, 'items in plan');
         }
     }
 
@@ -328,6 +346,7 @@ foreach ($existing_plan as $row) {
             div.onmouseleave = removeHoverHighlight;
             div.onclick = () => {
                 const posId = div.getAttribute('data-id');
+                console.log('Removing item with data-id:', posId);
                 // Удаляем только этот конкретный элемент
                 div.remove();
                 // Проверяем, остались ли еще элементы с этим data-id
@@ -607,7 +626,7 @@ foreach ($existing_plan as $row) {
                     const count = item.count;
                     const fullLabel = filterToLabel[filterName] || filterName;
                     
-                    // Находим соответствующую позицию в верхней таблице и используем ее data-id
+                    // ИСПРАВЛЕНО: Находим соответствующую позицию в верхней таблице и используем ее data-id
                     const posCell = Array.from(document.querySelectorAll('.position-cell')).find(cell => 
                         cell.dataset.label === fullLabel && !cell.classList.contains('used')
                     );
@@ -713,6 +732,7 @@ foreach ($existing_plan as $row) {
     function dragStart(e) {
         if (e.target === panelHeader || e.target.classList.contains('floating-panel-title')) {
             isDragging = true;
+            // Вычисляем offset с учетом текущей позиции панели
             const rect = panel.getBoundingClientRect();
             initialX = e.clientX - rect.left;
             initialY = e.clientY - rect.top;
@@ -753,3 +773,4 @@ foreach ($existing_plan as $row) {
 </div>
 </body>
 </html>
+
