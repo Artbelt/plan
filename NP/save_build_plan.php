@@ -13,8 +13,8 @@ $stmt->execute([$order]);
 
 // Вставим новые
 $insert = $pdo->prepare("
-    INSERT INTO build_plan (order_number, assign_date, place, filter_label, count)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO build_plan (order_number, assign_date, place, filter_label, count, corrugation_plan_id)
+    VALUES (?, ?, ?, ?, ?, ?)
 ");
 
 foreach ($data as $date => $places) {
@@ -22,9 +22,10 @@ foreach ($data as $date => $places) {
         foreach ($items as $item) {
             $label = $item['label'] ?? '';
             $count = $item['count'] ?? 0;
+            $corr_id = $item['corrugation_plan_id'] ?? null;
 
             if ($label && $count > 0) {
-                $insert->execute([$order, $date, $place, $label, $count]);
+                $insert->execute([$order, $date, $place, $label, $count, $corr_id]);
             }
         }
     }

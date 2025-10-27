@@ -16,13 +16,14 @@ for ($i = 0; $i < $days; $i++) {
 $end_date = (new DateTime($start))->modify('+' . ($days - 1) . ' days')->format('Y-m-d');
 
 // Получение позиций из гофроплана только в пределах выбранного диапазона дат
-$stmt = $pdo->prepare("SELECT plan_date, filter_label, count FROM corrugation_plan WHERE order_number = ? AND plan_date >= ? AND plan_date <= ?");
+$stmt = $pdo->prepare("SELECT id, plan_date, filter_label, count FROM corrugation_plan WHERE order_number = ? AND plan_date >= ? AND plan_date <= ?");
 $stmt->execute([$order, $start, $end_date]);
 $positions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $by_date = [];
 foreach ($positions as $p) {
     $tooltip = "{$p['filter_label']} | Кол-во гофропакетов: {$p['count']}";
     $by_date[$p['plan_date']][] = [
+        'id'      => $p['id'],
         'label'   => $p['filter_label'],
         'tooltip' => $tooltip,
         'count'   => $p['count']
@@ -30,7 +31,7 @@ foreach ($positions as $p) {
 }
 
 // Загрузка существующего плана сборки
-$stmt = $pdo->prepare("SELECT assign_date, place, filter_label, count FROM build_plan WHERE order_number = ? ORDER BY assign_date, place");
+$stmt = $pdo->prepare("SELECT assign_date, place, filter_label, count, corrugation_plan_id FROM build_plan WHERE order_number = ? ORDER BY assign_date, place");
 $stmt->execute([$order]);
 $existing_plan = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $plan_data = [];
@@ -43,7 +44,8 @@ foreach ($existing_plan as $row) {
     }
     $plan_data[$row['assign_date']][$row['place']][] = [
         'filter' => $row['filter_label'],
-        'count' => $row['count']
+        'count' => $row['count'],
+        'corrugation_plan_id' => $row['corrugation_plan_id']
     ];
 }
 ?>
@@ -234,6 +236,7 @@ foreach ($existing_plan as $row) {
                     ?>
                     <div class="position-cell"
                          data-id="<?= $uniqueId ?>"
+                         data-corr-id="<?= $item['id'] ?>"
                          data-label="<?= htmlspecialchars($item['label']) ?>"
                          data-count="<?= $item['count'] ?>"
                          title="<?= htmlspecialchars($item['tooltip']) ?>"
@@ -408,7 +411,9 @@ foreach ($existing_plan as $row) {
     }
 
     function distributeToBuildPlan(startDate, place) {
-        let total = parseInt(document.querySelector(`.position-cell[data-id="${selectedId}"]`).dataset.count);
+        const selectedCell = document.querySelector(`.position-cell[data-id="${selectedId}"]`);
+        let total = parseInt(selectedCell.dataset.count);
+        const selectedCorrId = selectedCell.dataset.corrId; // Получаем corrugation_plan_id
         const fillsPerDay = parseInt(document.getElementById("fills_per_day").value || "50");
         const dateHeaders = Array.from(document.querySelectorAll('#bottom-table thead th'));
         const dateList = dateHeaders.slice(1, dateHeaders.length - 1).map(th => th.innerText).filter(d => d >= startDate);
@@ -447,6 +452,7 @@ foreach ($existing_plan as $row) {
                 div.classList.add('assigned-item');
                 div.setAttribute('data-label', selectedLabel);
                 div.setAttribute('data-count', batch);
+                div.setAttribute('data-corr-id', selectedCorrId); // Добавляем corrugation_plan_id
                 if (td.querySelector('.assigned-item')) {
                     div.classList.add('half-width');
                     td.querySelector('.assigned-item').classList.add('half-width');
@@ -467,7 +473,8 @@ foreach ($existing_plan as $row) {
             const place = td.getAttribute('data-place');
             const items = Array.from(td.querySelectorAll('div')).map(d => ({
                 label: d.dataset.label,
-                count: d.dataset.count ? parseInt(d.dataset.count) : 0
+                count: d.dataset.count ? parseInt(d.dataset.count) : 0,
+                corrugation_plan_id: d.dataset.corrId ? parseInt(d.dataset.corrId) : null
             }));
             if (items.length > 0) {
                 if (!data[date]) data[date] = {};
@@ -599,36 +606,29 @@ foreach ($existing_plan as $row) {
             });
         });
         
-        // ШАГ 1: Собираем суммы по позициям из build_plan
-        const positionSums = {}; // { "AF1860 [40] 177": 346 }
+        // ШАГ 1: Собираем уникальные corrugation_plan_id из build_plan
+        const usedCorrIds = new Set();
         
         Object.keys(planData).forEach(date => {
             Object.keys(planData[date]).forEach(place => {
                 planData[date][place].forEach(item => {
-                    const filterName = item.filter;
-                    const fullLabel = filterToLabel[filterName] || filterName;
-                    const count = parseInt(item.count);
-                    positionSums[fullLabel] = (positionSums[fullLabel] || 0) + count;
+                    if (item.corrugation_plan_id) {
+                        usedCorrIds.add(parseInt(item.corrugation_plan_id));
+                    }
                 });
             });
         });
         
-        // ШАГ 2: Для каждой уникальной позиции ищем в верхней таблице и закрашиваем
-        Object.keys(positionSums).forEach(label => {
-            const totalCount = positionSums[label];
-            
-            // Ищем ячейку в верхней таблице с этой меткой и суммарным количеством
-            const posCell = Array.from(document.querySelectorAll('.position-cell')).find(cell => 
-                cell.dataset.label === label && 
-                parseInt(cell.dataset.count) === totalCount &&
-                !cell.classList.contains('used')
-            );
-            
+        console.log(`Найдено ${usedCorrIds.size} уникальных позиций для затенения`);
+        
+        // ШАГ 2: Закрашиваем позиции по corrugation_plan_id
+        usedCorrIds.forEach(corrId => {
+            const posCell = document.querySelector(`.position-cell[data-corr-id="${corrId}"]`);
             if (posCell) {
                 posCell.classList.add('used');
-                console.log(`Закрашена позиция: ${label}, количество: ${totalCount}`);
+                console.log(`✓ Закрашена позиция с id=${corrId}: ${posCell.dataset.label}`);
             } else {
-                console.warn(`Позиция "${label}" с количеством ${totalCount} не найдена в верхней таблице`);
+                console.warn(`⚠ Позиция с corrugation_plan_id=${corrId} не найдена в верхней таблице`);
             }
         });
         
@@ -671,6 +671,7 @@ foreach ($existing_plan as $row) {
                     div.classList.add('assigned-item');
                     div.setAttribute('data-label', fullLabel);
                     div.setAttribute('data-count', count);
+                    div.setAttribute('data-corr-id', item.corrugation_plan_id || ''); // Добавляем corrugation_plan_id
                     // Используем data-id из верхней таблицы
                     div.setAttribute('data-id', posCell.dataset.id);
                     
