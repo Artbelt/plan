@@ -389,16 +389,33 @@ foreach ($existing_plan as $row) {
 
     function renderPlacesForDate(date) {
         const modalPlaces = document.getElementById("modal-places");
+        const fillsPerDay = parseInt(document.getElementById("fills_per_day").value || "50");
         modalPlaces.innerHTML = "";
+        
         for (let i = 1; i <= 17; i++) {
             const btn = document.createElement("button");
-            btn.innerText = "Место " + i;
             const td = document.querySelector(`.drop-target[data-date='${date}'][data-place='${i}']`);
-            const items = td.querySelectorAll('.assigned-item');
-            const isFull = items.length >= 2;
+            
+            // Подсчитываем общее количество запланированных фильтров на это место
+            let totalPlanned = 0;
+            td.querySelectorAll('.assigned-item').forEach(item => {
+                const count = parseInt(item.dataset.count || 0);
+                totalPlanned += count;
+            });
+            
+            // Проверяем, заполнено ли место
+            const isFull = totalPlanned >= fillsPerDay;
+            
+            btn.innerText = `Место ${i}`;
+            if (totalPlanned > 0) {
+                btn.innerText += ` (${totalPlanned}/${fillsPerDay})`;
+            }
+            
             if (isFull) {
                 btn.disabled = true;
                 btn.style.opacity = "0.5";
+                btn.style.backgroundColor = "#e5e7eb";
+                btn.style.cursor = "not-allowed";
             } else {
                 btn.onclick = () => {
                     distributeToBuildPlan(date, i);
