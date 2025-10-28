@@ -6,3 +6,4 @@ ADD COLUMN corrugation_plan_id INT NULL AFTER filter_label;
 -- Проверка
 DESCRIBE build_plan;
 
+

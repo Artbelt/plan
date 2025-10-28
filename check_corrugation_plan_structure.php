@@ -14,3 +14,4 @@ $stmt = $pdo->query("SELECT * FROM corrugation_plan WHERE order_number = '43-50-
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 print_r($rows);
 
+

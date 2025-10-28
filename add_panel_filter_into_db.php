@@ -86,6 +86,115 @@ $form_factors = $pdo->query("SELECT id, name FROM form_factors ORDER BY id")->fe
         #change-log div {
             margin-bottom: 4px;
         }
+        
+        /* Модальные окна */
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,.2);
+            max-width: 400px;
+            width: 90%;
+            animation: slideIn .2s ease-out;
+        }
+        @keyframes slideIn {
+            from { transform: translateY(-20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 20px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .modal-header h3 {
+            margin: 0;
+            font-size: 18px;
+        }
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #9ca3af;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all .15s;
+        }
+        .modal-close:hover {
+            background: #fef3f2;
+            color: #f87171;
+        }
+        .modal-body {
+            padding: 20px;
+        }
+        .modal-footer {
+            padding: 16px 20px;
+            border-top: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: bold;
+            font-size: 13px;
+            color: #374151;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37,99,235,.1);
+        }
+        .btn-modal {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all .15s;
+        }
+        .btn-modal.primary {
+            background: #2563eb;
+            color: white;
+        }
+        .btn-modal.primary:hover {
+            background: #1e40af;
+        }
+        .btn-modal.secondary {
+            background: #f3f4f6;
+            color: #374151;
+            border-color: #d1d5db;
+        }
+        .btn-modal.secondary:hover {
+            background: #e5e7eb;
+        }
     </style>
 </head>
 <body>
@@ -258,15 +367,25 @@ if (isset($_POST['analog_filter']) AND ($_POST['analog_filter'] != '')){
     </div>
 
     <hr>
-    <div class="section-title">Индивидуальная упаковка:</div>
+    <div class="section-title" style="display:flex; justify-content:space-between; align-items:center;">
+        <span>Индивидуальная упаковка:</span>
+        <button type="button" onclick="openBoxModal()" 
+                style="width:28px; height:28px; border-radius:50%; background:#2563eb; color:white; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:bold;"
+                title="Добавить новую коробку">+</button>
+    </div>
     <div class="field-group">
-        <label>Коробка №: <select name="box"><?php select_boxes($analog_data['box']);?></select></label>
+        <label>Коробка №: <select name="box" id="box_select"><?php select_boxes($analog_data['box']);?></select></label>
     </div>
 
     <hr>
-    <div class="section-title">Групповая упаковка:</div>
+    <div class="section-title" style="display:flex; justify-content:space-between; align-items:center;">
+        <span>Групповая упаковка:</span>
+        <button type="button" onclick="openGBoxModal()" 
+                style="width:28px; height:28px; border-radius:50%; background:#059669; color:white; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:bold;"
+                title="Добавить новый ящик">+</button>
+    </div>
     <div class="field-group">
-        <label>Ящик №: <select name="g_box"><?php select_g_boxes($analog_data['g_box']);?></select></label>
+        <label>Ящик №: <select name="g_box" id="g_box_select"><?php select_g_boxes($analog_data['g_box']);?></select></label>
     </div>
 
     <hr>
@@ -283,6 +402,78 @@ if (isset($_POST['analog_filter']) AND ($_POST['analog_filter'] != '')){
 
     <input type="submit" value="Сохранить фильтр">
 </form>
+
+<!-- Модальное окно для добавления индивидуальной коробки -->
+<div id="boxModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Добавить новую коробку</h3>
+            <button class="modal-close" onclick="closeBoxModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>Номер коробки *</label>
+                <input type="text" id="b_name" placeholder="Например: 5" required>
+            </div>
+            <div class="form-group">
+                <label>Длина (мм) *</label>
+                <input type="text" id="b_length" placeholder="Например: 250" required>
+            </div>
+            <div class="form-group">
+                <label>Ширина (мм) *</label>
+                <input type="text" id="b_width" placeholder="Например: 180" required>
+            </div>
+            <div class="form-group">
+                <label>Высота (мм) *</label>
+                <input type="text" id="b_heght" placeholder="Например: 50" required>
+            </div>
+            <div class="form-group">
+                <label>Поставщик</label>
+                <input type="text" id="b_supplier" placeholder="Например: УУ" value="УУ">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-modal secondary" onclick="closeBoxModal()">Отмена</button>
+            <button type="button" class="btn-modal primary" onclick="saveBox()">Сохранить</button>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно для добавления группового ящика -->
+<div id="gBoxModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Добавить новый ящик</h3>
+            <button class="modal-close" onclick="closeGBoxModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>Номер ящика *</label>
+                <input type="text" id="gb_name" placeholder="Например: 10" required>
+            </div>
+            <div class="form-group">
+                <label>Длина (мм) *</label>
+                <input type="text" id="gb_length" placeholder="Например: 465" required>
+            </div>
+            <div class="form-group">
+                <label>Ширина (мм) *</label>
+                <input type="text" id="gb_width" placeholder="Например: 232" required>
+            </div>
+            <div class="form-group">
+                <label>Высота (мм) *</label>
+                <input type="text" id="gb_heght" placeholder="Например: 427" required>
+            </div>
+            <div class="form-group">
+                <label>Поставщик</label>
+                <input type="text" id="gb_supplier" placeholder="Например: УУ" value="УУ">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn-modal secondary" onclick="closeGBoxModal()">Отмена</button>
+            <button type="button" class="btn-modal primary" onclick="saveGBox()">Сохранить</button>
+        </div>
+    </div>
+</div>
 
 <script>
     document.addEventListener("DOMContentLoaded", function() {
@@ -307,6 +498,144 @@ if (isset($_POST['analog_filter']) AND ($_POST['analog_filter'] != '')){
             });
         });
     });
+    
+    // ========== Функции модального окна для индивидуальных коробок ==========
+    function openBoxModal() {
+        document.getElementById('boxModal').style.display = 'flex';
+        document.getElementById('b_name').value = '';
+        document.getElementById('b_length').value = '';
+        document.getElementById('b_width').value = '';
+        document.getElementById('b_heght').value = '';
+        document.getElementById('b_supplier').value = 'УУ';
+    }
+    
+    function closeBoxModal() {
+        document.getElementById('boxModal').style.display = 'none';
+    }
+    
+    document.getElementById('boxModal').addEventListener('click', function(e) {
+        if (e.target === this) closeBoxModal();
+    });
+    
+    async function saveBox() {
+        const b_name = document.getElementById('b_name').value.trim();
+        const b_length = document.getElementById('b_length').value.trim();
+        const b_width = document.getElementById('b_width').value.trim();
+        const b_heght = document.getElementById('b_heght').value.trim();
+        const b_supplier = document.getElementById('b_supplier').value.trim();
+        
+        if (!b_name || !b_length || !b_width || !b_heght) {
+            alert('Пожалуйста, заполните все обязательные поля (помеченные *)');
+            return;
+        }
+        
+        if (isNaN(parseFloat(b_length)) || isNaN(parseFloat(b_width)) || isNaN(parseFloat(b_heght))) {
+            alert('Длина, ширина и высота должны быть числами');
+            return;
+        }
+        
+        try {
+            const formData = new FormData();
+            formData.append('b_name', b_name);
+            formData.append('b_length', b_length.replace(/,/g, '.'));
+            formData.append('b_width', b_width.replace(/,/g, '.'));
+            formData.append('b_heght', b_heght.replace(/,/g, '.'));
+            formData.append('b_supplier', b_supplier);
+            
+            const response = await fetch('save_box.php', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                alert('✓ Коробка успешно добавлена!');
+                closeBoxModal();
+                
+                const select = document.getElementById('box_select');
+                const option = document.createElement('option');
+                option.value = b_name;
+                option.text = b_name;
+                option.selected = true;
+                select.appendChild(option);
+            } else {
+                alert('Ошибка при добавлении коробки: ' + (result.error || 'неизвестная ошибка'));
+            }
+        } catch (error) {
+            console.error('Ошибка:', error);
+            alert('Ошибка при сохранении коробки');
+        }
+    }
+    
+    // ========== Функции модального окна для групповых ящиков ==========
+    function openGBoxModal() {
+        document.getElementById('gBoxModal').style.display = 'flex';
+        document.getElementById('gb_name').value = '';
+        document.getElementById('gb_length').value = '';
+        document.getElementById('gb_width').value = '';
+        document.getElementById('gb_heght').value = '';
+        document.getElementById('gb_supplier').value = 'УУ';
+    }
+    
+    function closeGBoxModal() {
+        document.getElementById('gBoxModal').style.display = 'none';
+    }
+    
+    document.getElementById('gBoxModal').addEventListener('click', function(e) {
+        if (e.target === this) closeGBoxModal();
+    });
+    
+    async function saveGBox() {
+        const gb_name = document.getElementById('gb_name').value.trim();
+        const gb_length = document.getElementById('gb_length').value.trim();
+        const gb_width = document.getElementById('gb_width').value.trim();
+        const gb_heght = document.getElementById('gb_heght').value.trim();
+        const gb_supplier = document.getElementById('gb_supplier').value.trim();
+        
+        if (!gb_name || !gb_length || !gb_width || !gb_heght) {
+            alert('Пожалуйста, заполните все обязательные поля (помеченные *)');
+            return;
+        }
+        
+        if (isNaN(parseFloat(gb_length)) || isNaN(parseFloat(gb_width)) || isNaN(parseFloat(gb_heght))) {
+            alert('Длина, ширина и высота должны быть числами');
+            return;
+        }
+        
+        try {
+            const formData = new FormData();
+            formData.append('gb_name', gb_name);
+            formData.append('gb_length', gb_length.replace(/,/g, '.'));
+            formData.append('gb_width', gb_width.replace(/,/g, '.'));
+            formData.append('gb_heght', gb_heght.replace(/,/g, '.'));
+            formData.append('gb_supplier', gb_supplier);
+            
+            const response = await fetch('save_g_box.php', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                alert('✓ Ящик успешно добавлен!');
+                closeGBoxModal();
+                
+                const select = document.getElementById('g_box_select');
+                const option = document.createElement('option');
+                option.value = gb_name;
+                option.text = gb_name;
+                option.selected = true;
+                select.appendChild(option);
+            } else {
+                alert('Ошибка при добавлении ящика: ' + (result.error || 'неизвестная ошибка'));
+            }
+        } catch (error) {
+            console.error('Ошибка:', error);
+            alert('Ошибка при сохранении ящика');
+        }
+    }
 </script>
 
 </body>
